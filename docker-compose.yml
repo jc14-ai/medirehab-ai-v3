@@ -1,0 +1,31 @@
+services:
+  frontend:
+    build: ./client
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+  
+  backend:
+    build: ./server
+    environment:
+      DATABASE_URL: "postgres://user:password@db:5432/medirehab_ai"
+    ports:
+      - "5000:5000"
+    depends_on:
+      - db
+
+  ai-service:
+    build: ./ai-service
+    ports:
+      - "8000:8000"
+  
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: medirehab_ai
+    ports:
+      - "5432:5432"
+
