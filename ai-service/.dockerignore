@@ -1,0 +1,5 @@
+venv
+training
+data
+logs
+/app/__pycache__
