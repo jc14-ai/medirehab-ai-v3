@@ -33,7 +33,7 @@ pip install -r requirements.txt # do this if the project contains requirements.t
 ```
 ### 6. Run AI service server.
 ```bash
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 ### 7. Navigate to server folder then install dependencies.
 ```bash
