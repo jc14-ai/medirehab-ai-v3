@@ -1,6 +1,10 @@
 # MediRehab AI 3.0
-## DEVELOPMENT SETUP
+## LIVE LINKS
+##### Client: https://medirehab-ai.vercel.app
+##### Server: https://medirehab-ai-server.onrender.com
+##### AI Service: https://medirehab-ai-service.onrender.com
 
+## DEVELOPMENT SETUP
 ### 1. Clone this repository.
 ```bash
 clone https://github.com/jc14-ai/medirehab-ai-v3.git
