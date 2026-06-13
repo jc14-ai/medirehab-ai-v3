@@ -104,3 +104,45 @@ export const createPatientUser = async (
         }
     });
 };
+
+export const getMyProfile = async (userId: string) => {
+    const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+            id: true,
+            email: true,
+            role: true,
+            patientProfile: true,
+            doctorProfile: true
+        }
+    });
+
+    if (!user) {
+        throw new HttpError(404, "User not found.");
+    }
+
+    if (user.role === Role.PATIENT) {
+        return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            profile: user.patientProfile
+        };
+    }
+
+    if (user.role === Role.DOCTOR) {
+        return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            profile: user.doctorProfile
+        };
+    }
+
+    return {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        profile: null
+    };
+};
