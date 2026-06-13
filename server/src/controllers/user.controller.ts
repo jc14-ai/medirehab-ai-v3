@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import {
     createDoctorUser,
-    createPatientUser
+    createPatientUser,
+    getMyProfile
 } from "../services/user.service";
 import { HttpError } from "../utils/httpError";
 import {
@@ -66,5 +67,26 @@ export const createPatient = async (req: Request, res: Response): Promise<void> 
         });
     } catch (error) {
         handleCreateUserError(error, res, "Unable to create patient.");
+    }
+};
+
+export const meProfile = async (req: Request, res: Response): Promise<void> => {
+    try {
+        if (!req.user?.userId) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized."
+            });
+            return;
+        }
+
+        const user = await getMyProfile(req.user.userId);
+
+        res.status(200).json({
+            success: true,
+            user
+        });
+    } catch (error) {
+        handleCreateUserError(error, res, "Unable to load profile.");
     }
 };
