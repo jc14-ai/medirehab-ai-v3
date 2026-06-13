@@ -1,29 +1,11 @@
 import { Request, Response } from "express";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { prisma } from "../lib/prisma";
+import {
+    getCurrentUser,
+    InvalidCredentialsError,
+    loginUser
+} from "../services/auth.service";
 
 const AUTH_COOKIE_NAME = "authToken";
-
-const getJwtSecret = (): string => {
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
-        throw new Error("JWT_SECRET is not configured.");
-    }
-
-    return secret;
-};
-
-const toSafeUser = (user: {
-    id: string;
-    email: string;
-    role: string;
-}) => ({
-    id: user.id,
-    email: user.email,
-    role: user.role
-});
 
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -37,36 +19,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        const user = await prisma.user.findUnique({
-            where: { email }
-        });
-
-        if (!user) {
-            res.status(401).json({
-                success: false,
-                message: "Invalid email or password."
-            });
-            return;
-        }
-
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-
-        if (!isPasswordValid) {
-            res.status(401).json({
-                success: false,
-                message: "Invalid email or password."
-            });
-            return;
-        }
-
-        const token = jwt.sign(
-            {
-                userId: user.id,
-                role: user.role
-            },
-            getJwtSecret(),
-            { expiresIn: "7d" }
-        );
+        const { token, user } = await loginUser(email, password);
 
         res.cookie(AUTH_COOKIE_NAME, token, {
             httpOnly: true,
@@ -78,9 +31,17 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         res.status(200).json({
             success: true,
             message: "Login successful.",
-            user: toSafeUser(user)
+            user
         });
     } catch (error) {
+        if (error instanceof InvalidCredentialsError) {
+            res.status(401).json({
+                success: false,
+                message: error.message
+            });
+            return;
+        }
+
         res.status(500).json({
             success: false,
             message: "Unable to login."
@@ -111,14 +72,7 @@ export const me = async (req: Request, res: Response): Promise<void> => {
             return;
         }
 
-        const user = await prisma.user.findUnique({
-            where: { id: req.user.userId },
-            select: {
-                id: true,
-                email: true,
-                role: true
-            }
-        });
+        const user = await getCurrentUser(req.user.userId);
 
         if (!user) {
             res.status(404).json({

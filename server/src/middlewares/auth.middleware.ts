@@ -1,22 +1,7 @@
 import { NextFunction, Request, Response } from "express";
-import jwt from "jsonwebtoken";
+import { verifyAuthToken } from "../utils/jwt";
 
 const AUTH_COOKIE_NAME = "authToken";
-
-type AuthTokenPayload = {
-    userId: string;
-    role: string;
-};
-
-const getJwtSecret = (): string => {
-    const secret = process.env.JWT_SECRET;
-
-    if (!secret) {
-        throw new Error("JWT_SECRET is not configured.");
-    }
-
-    return secret;
-};
 
 const getTokenFromRequest = (req: Request): string | undefined => {
     const cookieToken = req.cookies?.[AUTH_COOKIE_NAME];
@@ -50,7 +35,7 @@ export const authMiddleware = (
             return;
         }
 
-        const decoded = jwt.verify(token, getJwtSecret()) as AuthTokenPayload;
+        const decoded = verifyAuthToken(token);
         req.user = {
             userId: decoded.userId,
             role: decoded.role
