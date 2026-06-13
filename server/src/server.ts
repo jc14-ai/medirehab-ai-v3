@@ -1,3 +1,4 @@
+import "dotenv/config";
 import app from "./app";
 
 const PORT: number = Number(process.env.EXPRESS_SERVER_PORT) || 5000;
