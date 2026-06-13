@@ -2,29 +2,10 @@ import { Role } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/httpError";
 import { hashPassword } from "../utils/password";
-
-type CreateDoctorInput = {
-    email: string;
-    password: string;
-    firstName?: string;
-    lastName?: string;
-    specialization?: string;
-    licenseNumber?: string;
-    contactNumber?: string;
-    clinicSchedule?: string;
-};
-
-type CreatePatientInput = {
-    email: string;
-    password: string;
-    firstName?: string;
-    lastName?: string;
-    birthDate?: string;
-    gender?: string;
-    contactNumber?: string;
-    address?: string;
-    medicalCondition?: string;
-};
+import {
+    ValidatedCreateDoctorInput,
+    ValidatedCreatePatientInput
+} from "../utils/userValidation";
 
 const ensureEmailAvailable = async (email: string): Promise<void> => {
     const existingUser = await prisma.user.findUnique({
@@ -50,7 +31,7 @@ const parseBirthDate = (birthDate?: string): Date | null => {
     return parsedDate;
 };
 
-export const createDoctorUser = async (input: CreateDoctorInput) => {
+export const createDoctorUser = async (input: ValidatedCreateDoctorInput) => {
     await ensureEmailAvailable(input.email);
 
     const hashedPassword = await hashPassword(input.password);
@@ -81,7 +62,7 @@ export const createDoctorUser = async (input: CreateDoctorInput) => {
 };
 
 export const createPatientUser = async (
-    input: CreatePatientInput,
+    input: ValidatedCreatePatientInput,
     createdByUserId: string
 ) => {
     await ensureEmailAvailable(input.email);

@@ -4,6 +4,10 @@ import {
     createPatientUser
 } from "../services/user.service";
 import { HttpError } from "../utils/httpError";
+import {
+    validateCreateDoctorInput,
+    validateCreatePatientInput
+} from "../utils/userValidation";
 
 const handleCreateUserError = (
     error: unknown,
@@ -26,35 +30,8 @@ const handleCreateUserError = (
 
 export const createDoctor = async (req: Request, res: Response): Promise<void> => {
     try {
-        const {
-            email,
-            password,
-            firstName,
-            lastName,
-            specialization,
-            licenseNumber,
-            contactNumber,
-            clinicSchedule
-        } = req.body;
-
-        if (!email || !password) {
-            res.status(400).json({
-                success: false,
-                message: "Email and password are required."
-            });
-            return;
-        }
-
-        const doctor = await createDoctorUser({
-            email,
-            password,
-            firstName,
-            lastName,
-            specialization,
-            licenseNumber,
-            contactNumber,
-            clinicSchedule
-        });
+        const input = validateCreateDoctorInput(req.body);
+        const doctor = await createDoctorUser(input);
 
         res.status(201).json({
             success: true,
@@ -76,38 +53,9 @@ export const createPatient = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        const {
-            email,
-            password,
-            firstName,
-            lastName,
-            birthDate,
-            gender,
-            contactNumber,
-            address,
-            medicalCondition
-        } = req.body;
-
-        if (!email || !password) {
-            res.status(400).json({
-                success: false,
-                message: "Email and password are required."
-            });
-            return;
-        }
-
+        const input = validateCreatePatientInput(req.body);
         const patient = await createPatientUser(
-            {
-                email,
-                password,
-                firstName,
-                lastName,
-                birthDate,
-                gender,
-                contactNumber,
-                address,
-                medicalCondition
-            },
+            input,
             req.user.userId
         );
 
