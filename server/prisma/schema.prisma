@@ -12,6 +12,10 @@ model User {
   email    String @unique
   password String
   role     Role   @default(PATIENT)
+  isActive Boolean @default(true)
+  archivedAt DateTime?
+  mustChangePassword Boolean @default(false)
+  passwordChangedAt DateTime?
 
   patientProfile PatientProfile?
   doctorProfile  DoctorProfile?
@@ -20,6 +24,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   @@map("users")
+  @@index([role, isActive])
 }
 
 model PatientProfile {

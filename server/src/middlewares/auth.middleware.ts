@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from "express";
+import { prisma } from "../lib/prisma";
 import { verifyAuthToken } from "../utils/jwt";
 
 const AUTH_COOKIE_NAME = "authToken";
@@ -19,11 +20,11 @@ const getTokenFromRequest = (req: Request): string | undefined => {
     return undefined;
 };
 
-export const authMiddleware = (
+export const authMiddleware = async (
     req: Request,
     res: Response,
     next: NextFunction
-): void => {
+): Promise<void> => {
     try {
         const token = getTokenFromRequest(req);
 
@@ -36,10 +37,30 @@ export const authMiddleware = (
         }
 
         const decoded = verifyAuthToken(token);
-        req.user = {
-            userId: decoded.userId,
-            role: decoded.role
-        };
+        const user = await prisma.user.findUnique({
+            where: { id: decoded.userId },
+            select: {
+                id: true,
+                role: true,
+                isActive: true,
+                archivedAt: true,
+                mustChangePassword: true
+            }
+        });
+
+        if (!user || !user.isActive || user.archivedAt) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized."
+            });
+            return;
+        }
+
+            req.user = {
+                userId: user.id,
+                role: user.role,
+                mustChangePassword: user.mustChangePassword
+            };
 
         next();
     } catch (error) {
