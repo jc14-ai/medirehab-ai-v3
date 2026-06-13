@@ -3,6 +3,7 @@ declare namespace Express {
         user?: {
             userId: string;
             role: string;
+            mustChangePassword: boolean;
         };
     }
 }

@@ -4,6 +4,7 @@ import {
     InvalidCredentialsError,
     loginUser
 } from "../services/auth.service";
+import { HttpError } from "../utils/httpError";
 
 const AUTH_COOKIE_NAME = "authToken";
 
@@ -31,11 +32,20 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         res.status(200).json({
             success: true,
             message: "Login successful.",
+            mustChangePassword: user.mustChangePassword,
             user
         });
     } catch (error) {
         if (error instanceof InvalidCredentialsError) {
             res.status(401).json({
+                success: false,
+                message: error.message
+            });
+            return;
+        }
+
+        if (error instanceof HttpError) {
+            res.status(error.statusCode).json({
                 success: false,
                 message: error.message
             });
@@ -84,7 +94,15 @@ export const me = async (req: Request, res: Response): Promise<void> => {
 
         res.status(200).json({
             success: true,
-            user
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                isActive: user.isActive,
+                archivedAt: user.archivedAt,
+                mustChangePassword: user.mustChangePassword,
+                passwordChangedAt: user.passwordChangedAt
+            }
         });
     } catch (error) {
         res.status(500).json({

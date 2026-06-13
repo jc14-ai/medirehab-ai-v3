@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma";
+import { HttpError } from "../utils/httpError";
 import { signAuthToken } from "../utils/jwt";
 import { comparePassword } from "../utils/password";
 
@@ -6,6 +7,10 @@ type SafeUser = {
     id: string;
     email: string;
     role: string;
+    isActive: boolean;
+    archivedAt: Date | null;
+    mustChangePassword: boolean;
+    passwordChangedAt: Date | null;
 };
 
 export class InvalidCredentialsError extends Error {
@@ -18,7 +23,11 @@ export class InvalidCredentialsError extends Error {
 const toSafeUser = (user: SafeUser): SafeUser => ({
     id: user.id,
     email: user.email,
-    role: user.role
+    role: user.role,
+    isActive: user.isActive,
+    archivedAt: user.archivedAt,
+    mustChangePassword: user.mustChangePassword,
+    passwordChangedAt: user.passwordChangedAt
 });
 
 export const loginUser = async (
@@ -31,6 +40,10 @@ export const loginUser = async (
 
     if (!user) {
         throw new InvalidCredentialsError();
+    }
+
+    if (!user.isActive || user.archivedAt) {
+        throw new HttpError(403, "Account is inactive.");
     }
 
     const isPasswordValid = await comparePassword(password, user.password);
@@ -56,7 +69,11 @@ export const getCurrentUser = async (userId: string): Promise<SafeUser | null> =
         select: {
             id: true,
             email: true,
-            role: true
+            role: true,
+            isActive: true,
+            archivedAt: true,
+            mustChangePassword: true,
+            passwordChangedAt: true
         }
     });
 };

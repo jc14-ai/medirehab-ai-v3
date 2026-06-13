@@ -53,6 +53,17 @@ export const validatePassword = (value: unknown): string => {
     return password;
 };
 
+export const validateBoolean = (
+    value: unknown,
+    fieldName: string
+): boolean => {
+    if (typeof value !== "boolean") {
+        throw new HttpError(400, `${fieldName} must be a boolean.`);
+    }
+
+    return value;
+};
+
 export const optionalDateString = (
     value: unknown,
     fieldName: string
@@ -70,4 +81,15 @@ export const optionalDateString = (
     }
 
     return dateValue;
+};
+
+export const ensureAtLeastOneDefined = (
+    values: Record<string, unknown>,
+    message = "At least one field is required."
+): void => {
+    const hasValue = Object.values(values).some((value) => value !== undefined);
+
+    if (!hasValue) {
+        throw new HttpError(400, message);
+    }
 };
