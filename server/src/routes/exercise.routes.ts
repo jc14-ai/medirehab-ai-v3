@@ -1,0 +1,91 @@
+import { Router } from "express";
+import { Role } from "@prisma/client";
+import {
+    archiveExerciseCatalogItem,
+    assignExercise,
+    createExerciseCatalogItem,
+    getAssignedExercisesForPatient,
+    getAvailableExercisesForPatient,
+    getExercises,
+    getMyAssignedExercises,
+    removeAssignedExercise,
+    updateExerciseCatalogItem
+} from "../controllers/exercise.controller";
+import { authMiddleware } from "../middlewares/auth.middleware";
+import { requirePasswordChanged } from "../middlewares/password.middleware";
+import { requireRole } from "../middlewares/role.middleware";
+
+const router = Router();
+
+router.get(
+    "/",
+    authMiddleware,
+    requirePasswordChanged,
+    getExercises
+);
+
+router.get(
+    "/me/assigned",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.PATIENT),
+    getMyAssignedExercises
+);
+
+router.post(
+    "/",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    createExerciseCatalogItem
+);
+
+router.patch(
+    "/:exerciseId",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    updateExerciseCatalogItem
+);
+
+router.delete(
+    "/:exerciseId",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    archiveExerciseCatalogItem
+);
+
+router.get(
+    "/patients/:patientUserId/available",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.DOCTOR),
+    getAvailableExercisesForPatient
+);
+
+router.get(
+    "/patients/:patientUserId/assigned",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.DOCTOR),
+    getAssignedExercisesForPatient
+);
+
+router.post(
+    "/patients/:patientUserId/assignments",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.DOCTOR),
+    assignExercise
+);
+
+router.delete(
+    "/patients/:patientUserId/assignments/:assignmentId",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.DOCTOR),
+    removeAssignedExercise
+);
+
+export default router;
