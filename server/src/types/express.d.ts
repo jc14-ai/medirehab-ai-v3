@@ -1,9 +1,13 @@
-declare namespace Express {
-    export interface Request {
-        user?: {
-            userId: string;
-            role: string;
-            mustChangePassword: boolean;
-        };
+export {};
+
+declare global {
+    namespace Express {
+        interface Request {
+            user?: {
+                userId: string;
+                role: string;
+                mustChangePassword: boolean;
+            };
+        }
     }
 }
