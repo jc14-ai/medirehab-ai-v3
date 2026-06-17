@@ -270,3 +270,33 @@ body {
   }
 }
 
+/* ── Admin Layout ── */
+.admin-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  background-color: var(--color-page-bg);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-nav-item:hover:not([style*="background-color: var(--color-primary-light)"]) {
+  background-color: var(--color-surface) !important;
+  color: var(--color-text-primary) !important;
+}
+
+@media (max-width: 768px) {
+  .admin-sidebar {
+    display: none !important;
+  }
+  .admin-mobile-header {
+    display: flex !important;
+  }
+  .admin-mobile-menu {
+    display: block !important;
+  }
+  .admin-main-content {
+    padding: 20px !important;
+  }
+}
+

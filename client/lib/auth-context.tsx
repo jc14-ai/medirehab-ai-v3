@@ -25,7 +25,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 /** Role → default dashboard path */
 const ROLE_DASHBOARDS: Record<UserRole, string> = {
-  ADMIN: "/admin",
+  ADMIN: "/admin/dashboard",
   DOCTOR: "/doctor",
   PATIENT: "/patient",
 };
