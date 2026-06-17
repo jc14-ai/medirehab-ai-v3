@@ -1,0 +1,223 @@
+import { Request, Response } from "express";
+import {
+    archiveExercise,
+    archivePatientExerciseAssignment,
+    assignExerciseToPatient,
+    createExercise,
+    listAssignedExercisesForDoctorPatient,
+    listAssignedExercisesForPatient,
+    listAvailableExercisesForPatient,
+    listExercises,
+    updateExercise
+} from "../services/exercise.service";
+import { HttpError } from "../utils/httpError";
+import {
+    validateAssignExerciseInput,
+    validateAssignmentIdParam,
+    validateCreateExerciseInput,
+    validateExerciseIdParam,
+    validateUpdateExerciseInput
+} from "../utils/exerciseValidation";
+import { validateUserIdParam } from "../utils/userValidation";
+
+const getAuthenticatedUserId = (req: Request): string => {
+    if (!req.user?.userId) {
+        throw new HttpError(401, "Unauthorized.");
+    }
+
+    return req.user.userId;
+};
+
+const handleExerciseError = (
+    error: unknown,
+    res: Response,
+    fallbackMessage: string
+): void => {
+    if (error instanceof HttpError) {
+        res.status(error.statusCode).json({
+            success: false,
+            message: error.message
+        });
+        return;
+    }
+
+    res.status(500).json({
+        success: false,
+        message: fallbackMessage
+    });
+};
+
+export const getExercises = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const exercises = await listExercises();
+
+        res.status(200).json({
+            success: true,
+            exercises
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to load exercises.");
+    }
+};
+
+export const createExerciseCatalogItem = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const input = validateCreateExerciseInput(req.body);
+        const exercise = await createExercise(input);
+
+        res.status(201).json({
+            success: true,
+            message: "Exercise created successfully.",
+            exercise
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to create exercise.");
+    }
+};
+
+export const updateExerciseCatalogItem = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const exerciseId = validateExerciseIdParam(req.params.exerciseId);
+        const input = validateUpdateExerciseInput(req.body);
+        const exercise = await updateExercise(exerciseId, input);
+
+        res.status(200).json({
+            success: true,
+            message: "Exercise updated successfully.",
+            exercise
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to update exercise.");
+    }
+};
+
+export const archiveExerciseCatalogItem = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const exerciseId = validateExerciseIdParam(req.params.exerciseId);
+        const exercise = await archiveExercise(exerciseId);
+
+        res.status(200).json({
+            success: true,
+            message: "Exercise archived successfully.",
+            exercise
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to archive exercise.");
+    }
+};
+
+export const getAvailableExercisesForPatient = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const doctorUserId = getAuthenticatedUserId(req);
+        const patientUserId = validateUserIdParam(req.params.patientUserId);
+        const exercises = await listAvailableExercisesForPatient(
+            patientUserId,
+            doctorUserId
+        );
+
+        res.status(200).json({
+            success: true,
+            exercises
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to load available exercises.");
+    }
+};
+
+export const getAssignedExercisesForPatient = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const doctorUserId = getAuthenticatedUserId(req);
+        const patientUserId = validateUserIdParam(req.params.patientUserId);
+        const assignments = await listAssignedExercisesForDoctorPatient(
+            patientUserId,
+            doctorUserId
+        );
+
+        res.status(200).json({
+            success: true,
+            assignments
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to load assigned exercises.");
+    }
+};
+
+export const getMyAssignedExercises = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const patientUserId = getAuthenticatedUserId(req);
+        const assignments = await listAssignedExercisesForPatient(patientUserId);
+
+        res.status(200).json({
+            success: true,
+            assignments
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to load assigned exercises.");
+    }
+};
+
+export const assignExercise = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const doctorUserId = getAuthenticatedUserId(req);
+        const patientUserId = validateUserIdParam(req.params.patientUserId);
+        const input = validateAssignExerciseInput(req.body);
+        const assignment = await assignExerciseToPatient(
+            patientUserId,
+            doctorUserId,
+            input
+        );
+
+        res.status(201).json({
+            success: true,
+            message: "Exercise assigned successfully.",
+            assignment
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to assign exercise.");
+    }
+};
+
+export const removeAssignedExercise = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const doctorUserId = getAuthenticatedUserId(req);
+        const patientUserId = validateUserIdParam(req.params.patientUserId);
+        const assignmentId = validateAssignmentIdParam(req.params.assignmentId);
+        const assignment = await archivePatientExerciseAssignment(
+            patientUserId,
+            doctorUserId,
+            assignmentId
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Assigned exercise removed successfully.",
+            assignment
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to remove assigned exercise.");
+    }
+};

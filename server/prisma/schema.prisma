@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,19 +8,139 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      Role     @default(USER)
+  id       String @id @default(cuid())
+  email    String @unique
+  password String
+  role     Role   @default(PATIENT)
+  isActive Boolean @default(true)
+  archivedAt DateTime?
+  mustChangePassword Boolean @default(false)
+  passwordChangedAt DateTime?
+
+  patientProfile PatientProfile?
+  doctorProfile  DoctorProfile?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("users")
+  @@index([role, isActive])
+}
+
+model PatientProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  firstName     String?
+  lastName      String?
+  birthDate     DateTime?
+  gender        String?
+  contactNumber String?
+  address       String?
+
+  medicalCondition String?
+  assignedDoctorId String?
+
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignedDoctor DoctorProfile? @relation(fields: [assignedDoctorId], references: [id])
+  exerciseAssignments ExerciseAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("patient_profiles")
+}
+
+model DoctorProfile {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  firstName     String?
+  lastName      String?
+  specialization String?
+  licenseNumber  String?
+  contactNumber  String?
+  clinicSchedule String?
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patients PatientProfile[]
+  assignedExercises ExerciseAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("doctor_profiles")
 }
 
 enum Role {
-  USER
+  PATIENT
+  DOCTOR
   ADMIN
+}
+
+model Exercise {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String
+  isActive    Boolean   @default(true)
+  archivedAt  DateTime?
+
+  images      ExerciseImage[]
+  assignments ExerciseAssignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("exercises")
+  @@index([isActive])
+}
+
+model ExerciseImage {
+  id         String @id @default(cuid())
+  exerciseId String
+  imageName  String
+  filepath   String
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("exercise_images")
+  @@index([exerciseId])
+}
+
+model ExerciseAssignment {
+  id                 String    @id @default(cuid())
+  exerciseId         String
+  patientProfileId   String
+  assignedByDoctorId String
+  assignedAt         DateTime  @default(now())
+  archivedAt         DateTime?
+
+  exercise         Exercise       @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
+  assignedByDoctor DoctorProfile  @relation(fields: [assignedByDoctorId], references: [id], onDelete: Restrict)
+  result           ExerciseResult?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("exercise_assignments")
+  @@unique([exerciseId, patientProfileId])
+  @@index([patientProfileId, archivedAt])
+  @@index([assignedByDoctorId])
+}
+
+model ExerciseResult {
+  id           String @id @default(cuid())
+  assignmentId String @unique
+  score        Float  @default(0)
+
+  assignment ExerciseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("exercise_results")
 }
