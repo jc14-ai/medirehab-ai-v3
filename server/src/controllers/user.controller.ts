@@ -7,6 +7,7 @@ import {
     createPatientUser,
     getDoctorByUserId,
     getMyProfile,
+    listPatientsForAdmin,
     getPatientForDoctor,
     listDoctors,
     listPatientsForDoctor,
@@ -125,6 +126,19 @@ export const getPatients = async (req: Request, res: Response): Promise<void> =>
     try {
         const authUser = getAuthenticatedUser(req);
         const patients = await listPatientsForDoctor(authUser.userId);
+
+        res.status(200).json({
+            success: true,
+            patients
+        });
+    } catch (error) {
+        handleUserError(error, res, "Unable to load patients.");
+    }
+};
+
+export const getAdminPatients = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const patients = await listPatientsForAdmin();
 
         res.status(200).json({
             success: true,

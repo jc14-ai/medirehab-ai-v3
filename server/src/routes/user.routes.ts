@@ -6,6 +6,7 @@ import {
     assignDoctorToPatient,
     createDoctor,
     createPatient,
+    getAdminPatients,
     getDoctor,
     getDoctors,
     getPatient,
@@ -43,6 +44,13 @@ router.get(
     requirePasswordChanged,
     requireRole(Role.ADMIN),
     getDoctor
+);
+router.get(
+    "/admin/patients",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    getAdminPatients
 );
 router.get(
     "/patients",

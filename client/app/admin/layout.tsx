@@ -68,6 +68,7 @@ function MenuIcon() {
 const NAV_ITEMS = [
   { name: "Dashboard", href: "/admin/dashboard", icon: <LayoutDashboardIcon /> },
   { name: "Doctors", href: "/admin/doctors", icon: <UsersIcon /> },
+  { name: "Patients", href: "/admin/patients", icon: <UsersIcon /> },
   { name: "Exercises", href: "/admin/exercises", icon: <ActivityIcon /> },
   { name: "Settings", href: "/admin/profile", icon: <SettingsIcon /> },
 ];
@@ -92,6 +93,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Close mobile menu on navigation
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
