@@ -1,0 +1,179 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { api, ApiError, type DoctorProfile } from "@/lib/api";
+
+export default function DoctorProfilePage() {
+  const { user, refreshUser } = useAuth();
+  const [profile, setProfile] = useState<Partial<DoctorProfile>>({});
+  const [loading, setLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [profileMessage, setProfileMessage] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [error, setError] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    api
+      .getProfile()
+      .then((res) => {
+        if (mounted) setProfile((res.user.profile as DoctorProfile) ?? {});
+      })
+      .catch((err) => {
+        if (mounted) setError(err instanceof ApiError ? err.message : "Failed to load profile.");
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleProfileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setProfile({ ...profile, [event.target.name]: event.target.value });
+  };
+
+  const handleSaveProfile = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setSavingProfile(true);
+    setError("");
+    setProfileMessage("");
+    try {
+      const res = await api.updateProfile(profile);
+      setProfile((res.user.profile as DoctorProfile) ?? {});
+      setProfileMessage("Profile updated successfully.");
+      await refreshUser();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to update profile.");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleChangePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setPasswordMessage("");
+
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setError("New password must be different from your current password.");
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      await api.changePassword(currentPassword, newPassword);
+      setPasswordMessage("Password changed successfully.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      await refreshUser();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to change password.");
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
+  if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: "80px" }}><div className="spinner" /></div>;
+
+  return (
+    <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "24px", maxWidth: "760px" }}>
+      <div>
+        <h1 style={{ fontSize: "28px", fontWeight: 700, margin: "0 0 8px 0" }}>Profile</h1>
+        <p style={{ color: "var(--color-text-secondary)", margin: 0 }}>Manage your doctor profile and account password.</p>
+      </div>
+
+      {error && (
+        <div style={{ padding: "14px 16px", backgroundColor: "#FEF2F2", color: "var(--color-danger)", borderRadius: "var(--radius-md)" }}>{error}</div>
+      )}
+
+      <section className="card" style={{ padding: "24px" }}>
+        <h2 style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 18px 0" }}>Account Information</h2>
+        <div className="doctor-form-grid">
+          <div>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Role</div>
+            <div style={{ fontWeight: 600, marginTop: "4px" }}>{user?.role}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-text-muted)", textTransform: "uppercase" }}>Email</div>
+            <div style={{ fontWeight: 600, marginTop: "4px" }}>{user?.email}</div>
+          </div>
+        </div>
+      </section>
+
+      <section className="card" style={{ padding: "24px" }}>
+        <h2 style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 18px 0" }}>Doctor Profile</h2>
+        {profileMessage && <div style={{ padding: "12px 16px", backgroundColor: "#DCFCE7", color: "#166534", borderRadius: "var(--radius-md)", marginBottom: "18px" }}>{profileMessage}</div>}
+        <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div className="doctor-form-grid">
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>First Name</label>
+              <input className="input" name="firstName" value={profile.firstName || ""} onChange={handleProfileChange} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>Last Name</label>
+              <input className="input" name="lastName" value={profile.lastName || ""} onChange={handleProfileChange} />
+            </div>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>Specialization</label>
+            <input className="input" name="specialization" value={profile.specialization || ""} onChange={handleProfileChange} />
+          </div>
+          <div className="doctor-form-grid">
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>License Number</label>
+              <input className="input" name="licenseNumber" value={profile.licenseNumber || ""} onChange={handleProfileChange} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>Contact Number</label>
+              <input className="input" name="contactNumber" value={profile.contactNumber || ""} onChange={handleProfileChange} />
+            </div>
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>Clinic Schedule</label>
+            <input className="input" name="clinicSchedule" value={profile.clinicSchedule || ""} onChange={handleProfileChange} />
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={savingProfile} style={{ alignSelf: "flex-start", minWidth: "130px" }}>
+            {savingProfile ? <div className="spinner spinner-white" style={{ width: "16px", height: "16px" }} /> : "Save Profile"}
+          </button>
+        </form>
+      </section>
+
+      <section className="card" style={{ padding: "24px" }}>
+        <h2 style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 18px 0" }}>Change Password</h2>
+        {passwordMessage && <div style={{ padding: "12px 16px", backgroundColor: "#DCFCE7", color: "#166534", borderRadius: "var(--radius-md)", marginBottom: "18px" }}>{passwordMessage}</div>}
+        <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div>
+            <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>Current Password</label>
+            <input type="password" className="input" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required />
+          </div>
+          <div className="doctor-form-grid">
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>New Password</label>
+              <input type="password" className="input" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={8} required />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: "14px", fontWeight: 500, marginBottom: "6px" }}>Confirm New Password</label>
+              <input type="password" className="input" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={8} required />
+            </div>
+          </div>
+          <button type="submit" className="btn btn-primary" disabled={savingPassword} style={{ alignSelf: "flex-start", minWidth: "150px" }}>
+            {savingPassword ? <div className="spinner spinner-white" style={{ width: "16px", height: "16px" }} /> : "Update Password"}
+          </button>
+        </form>
+      </section>
+    </div>
+  );
+}
