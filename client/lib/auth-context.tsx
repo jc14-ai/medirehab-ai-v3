@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { api, type ApiUser, ApiError } from "@/lib/api";
+import { api, type ApiUser } from "@/lib/api";
 
 type UserRole = "ADMIN" | "DOCTOR" | "PATIENT";
 
@@ -26,8 +26,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 /** Role → default dashboard path */
 const ROLE_DASHBOARDS: Record<UserRole, string> = {
   ADMIN: "/admin/dashboard",
-  DOCTOR: "/doctor",
-  PATIENT: "/patient",
+  DOCTOR: "/doctor/dashboard",
+  PATIENT: "/patient/dashboard",
 };
 
 /** Public paths that don't require auth */
@@ -65,7 +65,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       (p) => pathname === p || pathname === p + "/"
     );
     if (!user && !isPublic && pathname !== "/change-password") {
-      router.replace("/");
+      if (pathname.startsWith("/doctor")) {
+        router.replace("/login/doctor");
+      } else if (pathname.startsWith("/admin")) {
+        router.replace("/login/admin");
+      } else if (pathname.startsWith("/patient")) {
+        router.replace("/login/patient");
+      } else {
+        router.replace("/");
+      }
     }
   }, [user, loading, pathname, router]);
 

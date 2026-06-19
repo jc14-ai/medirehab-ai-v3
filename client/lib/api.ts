@@ -36,11 +36,13 @@ export interface PatientProfile {
 }
 
 export interface ApiDoctor extends ApiUser {
-  profile: DoctorProfile;
+  profile?: DoctorProfile;
+  doctorProfile?: DoctorProfile;
 }
 
 export interface ApiPatient extends ApiUser {
-  profile: PatientProfile;
+  profile?: PatientProfile;
+  patientProfile?: PatientProfile;
 }
 
 export interface ExerciseImage {
@@ -54,6 +56,19 @@ export interface ApiExercise {
   description: string;
   archivedAt: string | null;
   images: ExerciseImage[];
+}
+
+export interface ExerciseResult {
+  id: string;
+  score: number;
+}
+
+export interface ExerciseAssignment {
+  id: string;
+  assignedAt: string;
+  archivedAt: string | null;
+  exercise: ApiExercise;
+  result?: ExerciseResult;
 }
 
 export interface LoginResponse {
@@ -104,6 +119,20 @@ async function request<T>(
   return data as T;
 }
 
+function normalizeDoctor(doctor: ApiDoctor): ApiDoctor {
+  return {
+    ...doctor,
+    profile: doctor.profile ?? doctor.doctorProfile,
+  };
+}
+
+function normalizePatient(patient: ApiPatient): ApiPatient {
+  return {
+    ...patient,
+    profile: patient.profile ?? patient.patientProfile,
+  };
+}
+
 export const api = {
   // --- Auth & Session ---
   login(email: string, password: string) {
@@ -132,32 +161,38 @@ export const api = {
 
   // --- Admin: Doctors ---
   getDoctors() {
-    return request<{ success: boolean; doctors: ApiDoctor[] }>("/users/doctors");
+    return request<{ success: boolean; doctors: ApiDoctor[] }>("/users/doctors").then((res) => ({
+      ...res,
+      doctors: res.doctors.map(normalizeDoctor),
+    }));
   },
 
   getDoctor(userId: string) {
-    return request<{ success: boolean; doctor: ApiDoctor }>(`/users/doctors/${userId}`);
+    return request<{ success: boolean; doctor: ApiDoctor }>(`/users/doctors/${userId}`).then((res) => ({
+      ...res,
+      doctor: normalizeDoctor(res.doctor),
+    }));
   },
 
   createDoctor(data: Partial<ApiDoctor & DoctorProfile>) {
     return request<{ success: boolean; doctor: ApiDoctor; temporaryPassword?: string }>("/users/doctors", {
       method: "POST",
       body: JSON.stringify(data),
-    });
+    }).then((res) => ({ ...res, doctor: normalizeDoctor(res.doctor) }));
   },
 
   updateDoctor(userId: string, data: Partial<DoctorProfile>) {
     return request<{ success: boolean; doctor: ApiDoctor }>(`/users/doctors/${userId}`, {
       method: "PATCH",
       body: JSON.stringify(data),
-    });
+    }).then((res) => ({ ...res, doctor: normalizeDoctor(res.doctor) }));
   },
 
   updateDoctorStatus(userId: string, isActive: boolean) {
     return request<{ success: boolean; doctor: ApiDoctor }>(`/users/doctors/${userId}/status`, {
       method: "PATCH",
       body: JSON.stringify({ isActive }),
-    });
+    }).then((res) => ({ ...res, doctor: normalizeDoctor(res.doctor) }));
   },
 
   resetDoctorPassword(userId: string, newPassword: string) {
@@ -208,5 +243,81 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+  },
+
+  // --- Doctor: Patients ---
+  getPatients() {
+    return request<{ success: boolean; patients: ApiPatient[] }>("/users/patients").then((res) => ({
+      ...res,
+      patients: res.patients.map(normalizePatient),
+    }));
+  },
+
+  getPatient(userId: string) {
+    return request<{ success: boolean; patient: ApiPatient }>(`/users/patients/${userId}`).then((res) => ({
+      ...res,
+      patient: normalizePatient(res.patient),
+    }));
+  },
+
+  createPatient(data: Partial<ApiPatient & PatientProfile>) {
+    return request<{ success: boolean; patient: ApiPatient; temporaryPassword?: string }>("/users/patients", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }).then((res) => ({ ...res, patient: normalizePatient(res.patient) }));
+  },
+
+  updatePatient(userId: string, data: Partial<PatientProfile>) {
+    return request<{ success: boolean; patient: ApiPatient }>(`/users/patients/${userId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }).then((res) => ({ ...res, patient: normalizePatient(res.patient) }));
+  },
+
+  updatePatientStatus(userId: string, isActive: boolean) {
+    return request<{ success: boolean; patient: ApiPatient }>(`/users/patients/${userId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ isActive }),
+    }).then((res) => ({ ...res, patient: normalizePatient(res.patient) }));
+  },
+
+  resetPatientPassword(userId: string, newPassword: string) {
+    return request<ApiResponse>(`/users/patients/${userId}/password`, {
+      method: "PATCH",
+      body: JSON.stringify({ newPassword }),
+    });
+  },
+
+  deletePatient(userId: string) {
+    return request<ApiResponse>(`/users/patients/${userId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // --- Doctor: Exercise Assignments ---
+  getAvailableExercises(patientId: string) {
+    return request<{ success: boolean; exercises: ApiExercise[] }>(`/exercises/patients/${patientId}/available`);
+  },
+
+  getAssignedExercises(patientId: string) {
+    return request<{ success: boolean; assignments: ExerciseAssignment[] }>(`/exercises/patients/${patientId}/assigned`);
+  },
+
+  assignExercise(patientId: string, exerciseId: string) {
+    return request<{ success: boolean; assignment: ExerciseAssignment }>(`/exercises/patients/${patientId}/assignments`, {
+      method: "POST",
+      body: JSON.stringify({ exerciseId }),
+    });
+  },
+
+  removeAssignedExercise(patientId: string, assignmentId: string) {
+    return request<ApiResponse>(`/exercises/patients/${patientId}/assignments/${assignmentId}`, {
+      method: "DELETE",
+    });
+  },
+
+  // --- Patient: Assigned Exercises ---
+  getMyAssignedExercises() {
+    return request<{ success: boolean; assignments: ExerciseAssignment[] }>("/exercises/me/assigned");
   },
 };
