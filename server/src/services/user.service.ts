@@ -484,6 +484,13 @@ export const changeOwnPassword = async (
         throw new HttpError(401, "Current password is incorrect.");
     }
 
+    if (input.currentPassword === input.newPassword) {
+        throw new HttpError(
+            400,
+            "New password must be different from your current password."
+        );
+    }
+
     await completePasswordChange(user.id, input.newPassword);
 };
 

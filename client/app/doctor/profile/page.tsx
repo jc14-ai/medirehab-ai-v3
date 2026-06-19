@@ -66,6 +66,11 @@ export default function DoctorProfilePage() {
       return;
     }
 
+    if (currentPassword === newPassword) {
+      setError("New password must be different from your current password.");
+      return;
+    }
+
     setSavingPassword(true);
     try {
       await api.changePassword(currentPassword, newPassword);

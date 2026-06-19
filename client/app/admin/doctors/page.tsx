@@ -25,14 +25,6 @@ function EditIcon() {
   );
 }
 
-function KeyIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-    </svg>
-  );
-}
-
 function ArchiveIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -52,12 +44,23 @@ function ToggleIcon({ isActive }: { isActive: boolean }) {
   );
 }
 
+function ActiveAccountsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <polyline points="16 11 18 13 22 9" />
+    </svg>
+  );
+}
+
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<ApiDoctor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [accountTab, setAccountTab] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<ApiDoctor | undefined>(undefined);
@@ -96,6 +99,7 @@ export default function DoctorsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadDoctors();
   }, []);
 
@@ -166,18 +170,26 @@ export default function DoctorsPage() {
   };
 
   const filteredDoctors = doctors.filter((d) => {
+    const isArchived = Boolean(d.archivedAt);
     const matchesSearch =
       d.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.profile?.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      d.profile?.lastName.toLowerCase().includes(searchTerm.toLowerCase());
+      d.profile?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.profile?.lastName?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesTab =
+      accountTab === "ARCHIVED" ? isArchived : !isArchived;
     
     const matchesStatus =
+      accountTab === "ARCHIVED" ||
       filterStatus === "ALL" ||
-      (filterStatus === "ACTIVE" && d.isActive && !d.archivedAt) ||
-      (filterStatus === "INACTIVE" && (!d.isActive || d.archivedAt));
+      (filterStatus === "ACTIVE" && d.isActive) ||
+      (filterStatus === "INACTIVE" && !d.isActive);
 
-    return matchesSearch && matchesStatus;
+    return matchesTab && matchesSearch && matchesStatus;
   });
+
+  const activeAccountCount = doctors.filter((doctor) => !doctor.archivedAt).length;
+  const archivedAccountCount = doctors.filter((doctor) => doctor.archivedAt).length;
 
   return (
     <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -202,7 +214,36 @@ export default function DoctorsPage() {
       </div>
 
       <div className="card" style={{ padding: "20px" }}>
-        <div style={{ display: "flex", gap: "16px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+          <div className="account-tabs" role="tablist" aria-label="Doctor account status">
+            <button
+              type="button"
+              className={`account-tab ${accountTab === "ACTIVE" ? "account-tab-active" : ""}`}
+              onClick={() => setAccountTab("ACTIVE")}
+              role="tab"
+              aria-selected={accountTab === "ACTIVE"}
+              aria-label={`Active accounts, ${activeAccountCount}`}
+              title="Active accounts"
+            >
+              <ActiveAccountsIcon />
+              <span className="account-tab-count">{activeAccountCount}</span>
+            </button>
+            <button
+              type="button"
+              className={`account-tab ${accountTab === "ARCHIVED" ? "account-tab-active" : ""}`}
+              onClick={() => setAccountTab("ARCHIVED")}
+              role="tab"
+              aria-selected={accountTab === "ARCHIVED"}
+              aria-label={`Archived accounts, ${archivedAccountCount}`}
+              title="Archived accounts"
+            >
+              <ArchiveIcon />
+              <span className="account-tab-count">{archivedAccountCount}</span>
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
           <input
             type="text"
             className="input"
@@ -211,16 +252,18 @@ export default function DoctorsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{ maxWidth: "300px" }}
           />
-          <select
-            className="input"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            style={{ maxWidth: "150px" }}
-          >
-            <option value="ALL">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
+          {accountTab === "ACTIVE" && (
+            <select
+              className="input"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              style={{ maxWidth: "150px" }}
+            >
+              <option value="ALL">All Status</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          )}
         </div>
 
         {error && (
@@ -249,7 +292,7 @@ export default function DoctorsPage() {
                 {filteredDoctors.length === 0 ? (
                   <tr>
                     <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
-                      No doctors found.
+                      {accountTab === "ARCHIVED" ? "No archived doctors found." : "No active doctor accounts found."}
                     </td>
                   </tr>
                 ) : (

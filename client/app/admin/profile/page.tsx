@@ -29,6 +29,11 @@ export default function AdminProfilePage() {
       return;
     }
 
+    if (currentPassword === newPassword) {
+      setError("New password must be different from your current password.");
+      return;
+    }
+
     setLoading(true);
     try {
       await api.changePassword(currentPassword, newPassword);
