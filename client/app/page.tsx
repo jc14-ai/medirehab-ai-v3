@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth, ROLE_DASHBOARDS, type UserRole } from "@/lib/auth-context";
 import Link from "next/link";
 
@@ -109,12 +107,14 @@ function RoleCard({
   title,
   description,
   delay,
+  actionLabel = "Sign in",
 }: {
   href: string;
   icon: React.ReactNode;
   title: string;
   description: string;
   delay: string;
+  actionLabel?: string;
 }) {
   return (
     <Link
@@ -197,7 +197,7 @@ function RoleCard({
           marginTop: "4px",
         }}
       >
-        Sign in
+        {actionLabel}
         <ArrowRightIcon />
       </div>
     </Link>
@@ -207,18 +207,6 @@ function RoleCard({
 /* ── Homepage ── */
 export default function HomePage() {
   const { user, loading } = useAuth();
-  const router = useRouter();
-
-  // If user is already logged in, redirect to their dashboard
-  useEffect(() => {
-    if (!loading && user) {
-      if (user.mustChangePassword) {
-        router.replace("/change-password");
-      } else {
-        router.replace(ROLE_DASHBOARDS[user.role as UserRole]);
-      }
-    }
-  }, [user, loading, router]);
 
   if (loading) {
     return (
@@ -236,7 +224,14 @@ export default function HomePage() {
     );
   }
 
-  if (user) return null; // Redirect will happen
+  const dashboardHref = user?.mustChangePassword
+    ? "/change-password"
+    : user
+      ? ROLE_DASHBOARDS[user.role as UserRole]
+      : null;
+  const doctorHref = dashboardHref ?? "/login/doctor";
+  const patientHref = dashboardHref ?? "/login/patient";
+  const actionLabel = user ? "Back to dashboard" : "Sign in";
 
   return (
     <div
@@ -349,18 +344,20 @@ export default function HomePage() {
           }}
         >
           <RoleCard
-            href="/login/doctor"
+            href={doctorHref}
             icon={<StethoscopeIcon />}
             title="Doctor"
             description="Manage patients and assign rehabilitation exercises"
             delay="0.1s"
+            actionLabel={actionLabel}
           />
           <RoleCard
-            href="/login/patient"
+            href={patientHref}
             icon={<UserIcon />}
             title="Patient"
             description="View assigned exercises and track your recovery"
             delay="0.2s"
+            actionLabel={actionLabel}
           />
         </div>
       </main>

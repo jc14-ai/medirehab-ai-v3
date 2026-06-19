@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, ROLE_DASHBOARDS, type UserRole } from "@/lib/auth-context";
 import { ApiError } from "@/lib/api";
@@ -84,8 +84,35 @@ export default function LoginForm({ expectedRole }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login, logout } = useAuth();
+  const { user, loading, login, logout } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (loading || !user) return;
+
+    if (user.mustChangePassword) {
+      router.replace("/change-password");
+      return;
+    }
+
+    router.replace(ROLE_DASHBOARDS[user.role as UserRole]);
+  }, [user, loading, router]);
+
+  if (loading || user) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          backgroundColor: "var(--color-page-bg)",
+        }}
+      >
+        <div className="spinner" style={{ width: "32px", height: "32px" }} />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

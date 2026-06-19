@@ -4,7 +4,6 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, ROLE_DASHBOARDS, type UserRole } from "@/lib/auth-context";
 import { api, ApiError } from "@/lib/api";
-import Link from "next/link";
 
 function HeartPulseIcon() {
   return (
@@ -53,6 +52,11 @@ export default function ChangePasswordPage() {
 
     if (newPassword.length < 8) {
       setError("New password must be at least 8 characters.");
+      return;
+    }
+
+    if (currentPassword === newPassword) {
+      setError("New password must be different from your current password.");
       return;
     }
 

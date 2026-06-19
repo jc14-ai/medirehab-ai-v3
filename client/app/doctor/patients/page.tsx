@@ -7,6 +7,26 @@ import { PatientList } from "@/components/doctor/patient-list";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TemporaryPasswordDialog } from "@/components/ui/temporary-password-dialog";
 
+function ActiveAccountsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <polyline points="16 11 18 13 22 9" />
+    </svg>
+  );
+}
+
+function ArchivedAccountsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="21 8 21 21 3 21 3 8" />
+      <rect x="1" y="3" width="22" height="5" />
+      <line x1="10" y1="12" x2="14" y2="12" />
+    </svg>
+  );
+}
+
 function buildGeneratedPassword() {
   return `Temp${Math.random().toString(36).slice(2, 8)}!9A`;
 }
@@ -17,6 +37,7 @@ export default function DoctorPatientsPage() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [accountTab, setAccountTab] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPatient, setEditingPatient] = useState<ApiPatient | undefined>();
   const [formLoading, setFormLoading] = useState(false);
@@ -61,19 +82,26 @@ export default function DoctorPatientsPage() {
     const query = searchTerm.trim().toLowerCase();
     return patients.filter((patient) => {
       const profile = patient.profile;
+      const isArchived = Boolean(patient.archivedAt);
       const matchesSearch =
         !query ||
         patient.email.toLowerCase().includes(query) ||
         profile?.firstName?.toLowerCase().includes(query) ||
         profile?.lastName?.toLowerCase().includes(query) ||
         profile?.medicalCondition?.toLowerCase().includes(query);
+      const matchesTab =
+        accountTab === "ARCHIVED" ? isArchived : !isArchived;
       const matchesStatus =
+        accountTab === "ARCHIVED" ||
         filterStatus === "ALL" ||
-        (filterStatus === "ACTIVE" && patient.isActive && !patient.archivedAt) ||
-        (filterStatus === "INACTIVE" && (!patient.isActive || Boolean(patient.archivedAt)));
-      return matchesSearch && matchesStatus;
+        (filterStatus === "ACTIVE" && patient.isActive) ||
+        (filterStatus === "INACTIVE" && !patient.isActive);
+      return matchesTab && matchesSearch && matchesStatus;
     });
-  }, [patients, searchTerm, filterStatus]);
+  }, [patients, searchTerm, filterStatus, accountTab]);
+
+  const activeAccountCount = patients.filter((patient) => !patient.archivedAt).length;
+  const archivedAccountCount = patients.filter((patient) => patient.archivedAt).length;
 
   const handleSavePatient = async (data: Partial<ApiPatient & PatientProfile>) => {
     setFormLoading(true);
@@ -181,6 +209,35 @@ export default function DoctorPatientsPage() {
       </div>
 
       <div className="card" style={{ padding: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+          <div className="account-tabs" role="tablist" aria-label="Patient account status">
+            <button
+              type="button"
+              className={`account-tab ${accountTab === "ACTIVE" ? "account-tab-active" : ""}`}
+              onClick={() => setAccountTab("ACTIVE")}
+              role="tab"
+              aria-selected={accountTab === "ACTIVE"}
+              aria-label={`Active accounts, ${activeAccountCount}`}
+              title="Active accounts"
+            >
+              <ActiveAccountsIcon />
+              <span className="account-tab-count">{activeAccountCount}</span>
+            </button>
+            <button
+              type="button"
+              className={`account-tab ${accountTab === "ARCHIVED" ? "account-tab-active" : ""}`}
+              onClick={() => setAccountTab("ARCHIVED")}
+              role="tab"
+              aria-selected={accountTab === "ARCHIVED"}
+              aria-label={`Archived accounts, ${archivedAccountCount}`}
+              title="Archived accounts"
+            >
+              <ArchivedAccountsIcon />
+              <span className="account-tab-count">{archivedAccountCount}</span>
+            </button>
+          </div>
+        </div>
+
         <div className="doctor-toolbar" style={{ marginBottom: "20px" }}>
           <input
             type="text"
@@ -190,11 +247,13 @@ export default function DoctorPatientsPage() {
             onChange={(event) => setSearchTerm(event.target.value)}
             style={{ maxWidth: "340px" }}
           />
-          <select className="input" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} style={{ maxWidth: "170px" }}>
-            <option value="ALL">All status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive/Archived</option>
-          </select>
+          {accountTab === "ACTIVE" && (
+            <select className="input" value={filterStatus} onChange={(event) => setFilterStatus(event.target.value)} style={{ maxWidth: "170px" }}>
+              <option value="ALL">All status</option>
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          )}
         </div>
 
         {error && (
@@ -212,6 +271,7 @@ export default function DoctorPatientsPage() {
             onToggleStatus={handleToggleStatus}
             onArchive={handleArchive}
             onResetPassword={handleResetPassword}
+            emptyMessage={accountTab === "ARCHIVED" ? "No archived patients found." : "No active patient accounts found."}
           />
         )}
       </div>

@@ -15,17 +15,19 @@ export function PatientList({
   onToggleStatus,
   onArchive,
   onResetPassword,
+  emptyMessage = "No patients found.",
 }: {
   patients: ApiPatient[];
   onEdit: (patient: ApiPatient) => void;
   onToggleStatus: (patient: ApiPatient) => void;
   onArchive: (patient: ApiPatient) => void;
   onResetPassword: (patient: ApiPatient) => void;
+  emptyMessage?: string;
 }) {
   if (patients.length === 0) {
     return (
       <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
-        No patients found.
+        {emptyMessage}
       </div>
     );
   }
