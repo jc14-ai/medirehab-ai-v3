@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TemporaryPasswordDialog } from "@/components/ui/temporary-password-dialog";
 import { DoctorForm } from "@/components/admin/doctor-form";
+import Link from "next/link";
 
 function PlusIcon() {
   return (
@@ -52,6 +53,18 @@ function ActiveAccountsIcon() {
       <polyline points="16 11 18 13 22 9" />
     </svg>
   );
+}
+
+function KeyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+    </svg>
+  );
+}
+
+function buildGeneratedPassword() {
+  return `Temp${Math.random().toString(36).slice(2, 8)}!9A`;
 }
 
 export default function DoctorsPage() {
@@ -162,6 +175,30 @@ export default function DoctorsPage() {
         } catch (err) {
           if (err instanceof ApiError) alert(err.message);
           else alert("Operation failed");
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      },
+    });
+  };
+
+  const handleResetPassword = (doctor: ApiDoctor) => {
+    const nextPassword = buildGeneratedPassword();
+    setConfirmDialog({
+      isOpen: true,
+      title: "Reset Doctor Password",
+      message: `Reset password for Dr. ${doctor.profile?.lastName || doctor.email}? A new temporary password will be shown after reset.`,
+      isDestructive: false,
+      isLoading: false,
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await api.resetDoctorPassword(doctor.id, nextPassword);
+          setTempPassword(nextPassword);
+          setIsTempPasswordOpen(true);
+        } catch (err) {
+          if (err instanceof ApiError) alert(err.message);
+          else alert("Password reset failed");
         } finally {
           setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
         }
@@ -299,7 +336,9 @@ export default function DoctorsPage() {
                   filteredDoctors.map((doctor) => (
                     <tr key={doctor.id} style={{ borderBottom: "1px solid var(--color-page-bg)", transition: "background-color 0.15s ease" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--color-primary-soft)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}>
                       <td style={{ padding: "12px 16px", fontWeight: 500, color: "var(--color-text-primary)" }}>
-                        {doctor.profile ? `Dr. ${doctor.profile.firstName} ${doctor.profile.lastName}` : "Unknown"}
+                        <Link href={`/admin/doctors/${doctor.id}`} style={{ color: "var(--color-primary)", textDecoration: "none" }}>
+                          {doctor.profile ? `Dr. ${doctor.profile.firstName} ${doctor.profile.lastName}` : "Unknown"}
+                        </Link>
                       </td>
                       <td style={{ padding: "12px 16px", color: "var(--color-text-secondary)", fontSize: "14px" }}>
                         {doctor.email}
@@ -318,6 +357,13 @@ export default function DoctorsPage() {
                             onClick={() => { setEditingDoctor(doctor); setIsFormOpen(true); }}
                           >
                             <EditIcon />
+                          </button>
+                          <button
+                            title="Reset password"
+                            style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", padding: "4px" }}
+                            onClick={() => handleResetPassword(doctor)}
+                          >
+                            <KeyIcon />
                           </button>
                           <button
                             title={doctor.isActive ? "Deactivate" : "Activate"}

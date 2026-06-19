@@ -33,6 +33,10 @@ export interface PatientProfile {
   contactNumber: string;
   address: string;
   medicalCondition: string;
+  assignedDoctorId?: string | null;
+  assignedDoctor?: (DoctorProfile & {
+    user?: Pick<ApiUser, "id" | "email" | "isActive" | "archivedAt">;
+  }) | null;
 }
 
 export interface ApiDoctor extends ApiUser {
@@ -206,6 +210,21 @@ export const api = {
     return request<ApiResponse>(`/users/doctors/${userId}`, {
       method: "DELETE",
     });
+  },
+
+  // --- Admin: Patients ---
+  getAdminPatients() {
+    return request<{ success: boolean; patients: ApiPatient[] }>("/users/admin/patients").then((res) => ({
+      ...res,
+      patients: res.patients.map(normalizePatient),
+    }));
+  },
+
+  assignPatientToDoctor(patientUserId: string, doctorUserId: string) {
+    return request<{ success: boolean; patient: ApiPatient }>(`/users/patients/${patientUserId}/assign-doctor`, {
+      method: "PATCH",
+      body: JSON.stringify({ doctorUserId }),
+    }).then((res) => ({ ...res, patient: normalizePatient(res.patient) }));
   },
 
   // --- Admin: Exercises ---

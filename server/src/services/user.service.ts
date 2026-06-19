@@ -36,6 +36,26 @@ const patientUserSelect = {
     patientProfile: true
 } satisfies Prisma.UserSelect;
 
+const adminPatientUserSelect = {
+    ...baseUserSelect,
+    patientProfile: {
+        include: {
+            assignedDoctor: {
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            email: true,
+                            isActive: true,
+                            archivedAt: true
+                        }
+                    }
+                }
+            }
+        }
+    }
+} satisfies Prisma.UserSelect;
+
 const ensureEmailAvailable = async (email: string): Promise<void> => {
     const existingUser = await prisma.user.findUnique({
         where: { email }
@@ -342,6 +362,16 @@ export const listPatientsForDoctor = async (doctorUserId: string) => {
         },
         select: {
             ...patientUserSelect
+        },
+        orderBy: { createdAt: "desc" }
+    });
+};
+
+export const listPatientsForAdmin = async () => {
+    return prisma.user.findMany({
+        where: { role: Role.PATIENT },
+        select: {
+            ...adminPatientUserSelect
         },
         orderBy: { createdAt: "desc" }
     });
