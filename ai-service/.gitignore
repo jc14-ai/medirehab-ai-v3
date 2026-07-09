@@ -1,4 +1,4 @@
 venv
-data
+raw_videos
 .env
 __pycache__
