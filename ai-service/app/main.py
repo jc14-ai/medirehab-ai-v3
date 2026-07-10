@@ -1,6 +1,6 @@
 from fastapi import FastAPI
+from app.api.routes.evaulate import router as evaluate_router
+
 app = FastAPI()
 
-@app.get("/")
-def home():
-    return {"message": "FastAPI is running."}
+app.include_router(evaluate_router)

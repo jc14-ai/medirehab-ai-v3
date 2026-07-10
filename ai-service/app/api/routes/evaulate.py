@@ -22,6 +22,8 @@ def model(exercise_id: str):
         model_checkpoint = torch.load("app/models/model.pth", map_location="cpu")
         model.load_state_dict(model_checkpoint["model"])
         
+    
+        
     return {
-        "message": "model selected."
+        "evaluation_score": "model selected."
     }
