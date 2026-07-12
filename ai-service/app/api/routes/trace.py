@@ -1,4 +1,6 @@
-from fastapi import APIRouter
+import uuid
+
+from fastapi import APIRouter, UploadFile, File
 from ultralytics import YOLO
 import csv
 import cv2
@@ -11,11 +13,22 @@ router = APIRouter(
     tags=["trace"]
 )
 
-@router.get("/{user_id}/{exercise_id}")
-def trace(user_id: str, exercise_id: str):
+@router.post("/{user_id}/{exercise_id}")
+async def trace(user_id: str, exercise_id: str, video: UploadFile = File(...)):
     
     video_folder = f"data/videos/user_{user_id}/exercise_{exercise_id}"
+    
+    os.makedirs(video_folder, exist_ok=True)
+    
+    filename = f"{uuid.uuid4()}.webm"
+    file_path = os.path.join(video_folder, filename)
+    
+    with open(file_path, "wb") as f:
+        f.write( await video.read())
+    
     output_folder = f"data/trace/user_{user_id}/exercise_{exercise_id}"
+    
+    os.makedirs(output_folder, exist_ok=True)
     
     if os.path.exists(video_folder):
         for filename in sorted(os.listdir(video_folder)):
