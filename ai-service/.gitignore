@@ -2,3 +2,5 @@ venv
 raw_videos
 .env
 __pycache__
+data/videos/user*
+data/trace/user*
