@@ -337,6 +337,16 @@ export const api = {
 
   // --- Patient: Assigned Exercises ---
   getMyAssignedExercises() {
-    return request<{ success: boolean; assignments: ExerciseAssignment[] }>("/exercises/me/assigned");
+    return request<{ success: boolean; assignments: ExerciseAssignment[], patientUserId: string }>("/exercises/me/assigned");
+  },
+
+  evaluateExercise(patientUserId: string, exerciseId: string, assignmentId: string, videoBlob: Blob) {
+    return request<{ success: boolean; score: number; message?: string }>(`/exercises/patients/${patientUserId}/exercises/${exerciseId}/assignments/${assignmentId}/evaluate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": videoBlob.type || "video/webm",
+      },
+      body: videoBlob,
+    });
   },
 };
