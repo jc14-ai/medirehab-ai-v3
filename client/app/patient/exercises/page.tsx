@@ -8,6 +8,7 @@ export default function PatientExercisesPage() {
   const [assignments, setAssignments] = useState<ExerciseAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [patientUserId, setPatientUserId] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -17,6 +18,9 @@ export default function PatientExercisesPage() {
       try {
         const res = await api.getMyAssignedExercises();
         if (mounted) setAssignments(res.assignments);
+        if (res.patientUserId) {
+          setPatientUserId(res.patientUserId);
+        }
       } catch (err) {
         if (mounted) setError(err instanceof ApiError ? err.message : "Failed to load assigned exercises.");
       } finally {
@@ -71,7 +75,7 @@ export default function PatientExercisesPage() {
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", padding: "48px" }}><div className="spinner" /></div>
         ) : (
-          <MyExerciseList assignments={filteredAssignments} />
+          <MyExerciseList assignments={filteredAssignments} patientUserId={patientUserId} />
         )}
       </div>
     </div>
