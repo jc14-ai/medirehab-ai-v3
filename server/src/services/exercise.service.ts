@@ -323,3 +323,78 @@ export const archivePatientExerciseAssignment = async (
         select: assignmentSelect
     });
 };
+
+export const evaluateExercise = async (
+    patientUserId: string,
+    exerciseId: string,
+    assignmentId: string,
+    videoBuffer: Buffer
+) => {
+    const uint8Array = new Uint8Array(videoBuffer);
+
+    const formData = new FormData();
+    formData.append(
+        "video",
+        new Blob([uint8Array], { type: "video/webm" }),
+        "exercise.webm"
+    );
+
+    const res = await fetch(
+        `http://127.0.0.1:8000/trace/${patientUserId}/${exerciseId}`,
+        {
+            method: "POST",
+            body: formData,
+        }
+    );
+    const data = await res.json();
+    
+    let score = 0;
+
+    if(data.success) {
+        const res = await fetch(`http://127.0.0.1:8000/evaluate/${patientUserId}/${exerciseId}`);
+        const data = await res.json();
+
+        if(!data.success) {
+            throw new HttpError(500, "Failed to evaluate exercise.");
+        }
+
+        score = data.score;
+    }
+
+    // Find patient profile
+    // const patient = await prisma.patientProfile.findUnique({
+    //     where: { userId: patientUserId }
+    // });
+
+    // if (!patient) {
+    //     throw new HttpError(404, "Patient profile not found.");
+    // }
+
+    // Verify the assignment belongs to this patient and exercise catalog item
+    // const assignment = await prisma.exerciseAssignment.findFirst({
+    //     where: {
+    //         id: assignmentId,
+    //         patientProfileId: patient.id,
+    //         exerciseId: exerciseId
+    //     }
+    // });
+
+    // if (!assignment) {
+    //     throw new HttpError(404, "Assignment not found.");
+    // }
+
+    // Update or create the result
+    // const result = await prisma.exerciseResult.upsert({
+    //     where: { assignmentId },
+    //     create: {
+    //         assignmentId,
+    //         score
+    //     },
+    //     update: {
+    //         score
+    //     }
+    // });
+
+    return { score };
+};
+
