@@ -234,7 +234,7 @@ export const evaluateExerciseAssignment = async (
         const exerciseId = validateExerciseIdParam(req.params.exerciseId);
         const assignmentId = validateAssignmentIdParam(req.params.assignmentId);
 
-        if (authenticatedUserId !== patientUserId) {
+        if (!authenticatedUserId) {
             throw new HttpError(403, "Forbidden. You can only evaluate your own exercises.");
         }
 
@@ -245,7 +245,7 @@ export const evaluateExerciseAssignment = async (
             try {
                 const videoBuffer = Buffer.concat(chunks);
                 const result = await evaluateExercise(
-                    patientUserId,
+                    authenticatedUserId,
                     exerciseId,
                     assignmentId,
                     videoBuffer
