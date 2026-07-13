@@ -15,11 +15,9 @@ function formatDate(value?: string) {
 export function MyExerciseList({
   assignments,
   compact = false,
-  patientUserId
 }: {
   assignments: ExerciseAssignment[];
   compact?: boolean;
-  patientUserId: string;
 }) {
   if (assignments.length === 0) {
     return (
@@ -76,7 +74,6 @@ export function MyExerciseList({
               exerciseName={assignment.exercise?.name}
               exerciseId={assignment.exercise?.id}
               assignmentId={assignment.id}
-              patientUserId={patientUserId}
             />
           </div>
         </article>

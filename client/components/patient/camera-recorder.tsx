@@ -9,10 +9,9 @@ interface CameraRecorderProps {
     exerciseId: string;
     assignmentId?: string;
     onSave?: (blob: Blob) => void;
-    patientUserId: string;
 }
 
-export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignmentId, onSave, patientUserId }: CameraRecorderProps) {
+export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignmentId, onSave}: CameraRecorderProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [stream, setStream] = useState<MediaStream | null>(null);
     const [isRecording, setIsRecording] = useState(false);
@@ -164,7 +163,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         setIsEvaluating(true);
         setError(null);
         try {
-            const res = await api.evaluateExercise(patientUserId, exerciseId, assignmentId, blobRef.current);
+            const res = await api.evaluateExercise(exerciseId, assignmentId, blobRef.current);
             if (res.success) {
                 setEvaluationScore(res.score);
             } else {

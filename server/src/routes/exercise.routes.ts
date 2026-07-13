@@ -34,7 +34,7 @@ router.get(
 );
 
 router.post(
-    "/patients/:patientUserId/exercises/:exerciseId/assignments/:assignmentId/evaluate",
+    "/patients/exercises/:exerciseId/assignments/:assignmentId/evaluate",
     authMiddleware,
     requirePasswordChanged,
     requireRole(Role.PATIENT),

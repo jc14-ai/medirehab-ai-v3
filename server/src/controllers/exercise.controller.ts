@@ -230,7 +230,6 @@ export const evaluateExerciseAssignment = async (
 ): Promise<void> => {
     try {
         const authenticatedUserId = getAuthenticatedUserId(req);
-        const patientUserId = validateUserIdParam(req.params.patientUserId);
         const exerciseId = validateExerciseIdParam(req.params.exerciseId);
         const assignmentId = validateAssignmentIdParam(req.params.assignmentId);
 
