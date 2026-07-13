@@ -9,7 +9,8 @@ import {
     getExercises,
     getMyAssignedExercises,
     removeAssignedExercise,
-    updateExerciseCatalogItem
+    updateExerciseCatalogItem,
+    evaluateExerciseAssignment
 } from "../controllers/exercise.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { requirePasswordChanged } from "../middlewares/password.middleware";
@@ -30,6 +31,14 @@ router.get(
     requirePasswordChanged,
     requireRole(Role.PATIENT),
     getMyAssignedExercises
+);
+
+router.post(
+    "/patients/exercises/:exerciseId/assignments/:assignmentId/evaluate",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.PATIENT),
+    evaluateExerciseAssignment
 );
 
 router.post(

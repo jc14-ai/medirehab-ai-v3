@@ -71,7 +71,7 @@ export default function PatientExercisesPage() {
         {loading ? (
           <div style={{ display: "flex", justifyContent: "center", padding: "48px" }}><div className="spinner" /></div>
         ) : (
-          <MyExerciseList assignments={filteredAssignments} />
+          <MyExerciseList assignments={filteredAssignments}/>
         )}
       </div>
     </div>

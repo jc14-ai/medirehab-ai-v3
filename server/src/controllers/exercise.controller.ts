@@ -8,7 +8,8 @@ import {
     listAssignedExercisesForPatient,
     listAvailableExercisesForPatient,
     listExercises,
-    updateExercise
+    updateExercise,
+    evaluateExercise
 } from "../services/exercise.service";
 import { HttpError } from "../utils/httpError";
 import {
@@ -167,7 +168,8 @@ export const getMyAssignedExercises = async (
 
         res.status(200).json({
             success: true,
-            assignments
+            assignments,
+            patientUserId
         });
     } catch (error) {
         handleExerciseError(error, res, "Unable to load assigned exercises.");
@@ -219,5 +221,45 @@ export const removeAssignedExercise = async (
         });
     } catch (error) {
         handleExerciseError(error, res, "Unable to remove assigned exercise.");
+    }
+};
+
+export const evaluateExerciseAssignment = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const authenticatedUserId = getAuthenticatedUserId(req);
+        const exerciseId = validateExerciseIdParam(req.params.exerciseId);
+        const assignmentId = validateAssignmentIdParam(req.params.assignmentId);
+
+        if (!authenticatedUserId) {
+            throw new HttpError(403, "Forbidden. You can only evaluate your own exercises.");
+        }
+
+        const chunks: Buffer[] = [];
+        req.on("data", (chunk) => chunks.push(chunk));
+        
+        req.on("end", async () => {
+            try {
+                const videoBuffer = Buffer.concat(chunks);
+                const result = await evaluateExercise(
+                    authenticatedUserId,
+                    exerciseId,
+                    assignmentId,
+                    videoBuffer
+                );
+
+                res.status(200).json({
+                    success: true,
+                    message: "Exercise evaluated successfully.",
+                    ...result
+                });
+            } catch (innerError) {
+                handleExerciseError(innerError, res, "Error evaluating exercise recording.");
+            }
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to process exercise evaluation.");
     }
 };

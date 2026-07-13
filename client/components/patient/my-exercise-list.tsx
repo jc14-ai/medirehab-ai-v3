@@ -1,6 +1,7 @@
 "use client";
 
 import { type ExerciseAssignment } from "@/lib/api";
+import { CameraRecorder } from "./camera-recorder";
 
 function formatDate(value?: string) {
   if (!value) return "-";
@@ -69,9 +70,11 @@ export function MyExerciseList({
           ) : null}
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "auto" }}>
-            <button className="btn btn-primary" disabled title="Exercise capture is not available yet." style={{ height: "38px", padding: "0 14px" }}>
-              Start Exercise
-            </button>
+            <CameraRecorder
+              exerciseName={assignment.exercise?.name}
+              exerciseId={assignment.exercise?.id}
+              assignmentId={assignment.id}
+            />
           </div>
         </article>
       ))}
