@@ -32,7 +32,7 @@ async def trace(user_id: str, exercise_id: str, video: UploadFile = File(...)):
     
     if os.path.exists(video_folder):
         for filename in sorted(os.listdir(video_folder)):
-            if filename.endswith((".mp4", ".avi", ".mov", ".mkv")):
+            if filename.endswith((".mp4", ".avi", ".mov", ".mkv", ".webm")):
                 video_path = os.path.join(video_folder, filename)
                 output_csv_path = get_next_sequence_path(output_folder)
                 process_video_to_csv(video_path, output_csv_path)

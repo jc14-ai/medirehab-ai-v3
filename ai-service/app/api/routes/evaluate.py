@@ -24,11 +24,13 @@ model object structure:
 def evaluate(user_id: str, exercise_id: str):
     output_folder = f"data/trace/user_{user_id}/exercise_{exercise_id}"
     data, input_dim = preprocess(output_folder)
+    
+    model_checkpoint = None
+    model = None
+    
+    mean_val_loss = 0.0
+    beta = 1.0
 
-    global model_checkpoint
-    global model
-    global mean_val_loss
-    global beta
     model = build_model(input_dim)
     
     if exercise_id == "1" and os.path.exists("app/models/model.pth"):
@@ -37,11 +39,11 @@ def evaluate(user_id: str, exercise_id: str):
         mean_val_loss = model_checkpoint.get("mean_val_loss", 0.0)
         beta = model_checkpoint.get("beta", 1.0)
         
-    elif exercise_id == "1" and os.path.exists("app/models/model.pth"):
-        model_checkpoint = torch.load("app/models/model.pth", map_location="cpu")
-        model.load_state_dict(model_checkpoint["model"])
-        mean_val_loss = model_checkpoint.get("mean_val_loss", 0.0)
-        beta = model_checkpoint.get("beta", 1.0)
+    # elif exercise_id == "1" and os.path.exists("app/models/model.pth"):
+    #     model_checkpoint = torch.load("app/models/model.pth", map_location="cpu")
+    #     model.load_state_dict(model_checkpoint["model"])
+    #     mean_val_loss = model_checkpoint.get("mean_val_loss", 0.0)
+    #     beta = model_checkpoint.get("beta", 1.0)
         
     error = get_reconstruction_error(model, data)
     score = compute_similarity_score(error, mean_val_loss, beta)
