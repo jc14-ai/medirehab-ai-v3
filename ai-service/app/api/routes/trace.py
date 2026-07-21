@@ -5,13 +5,37 @@ from ultralytics import YOLO
 import csv
 import cv2
 import os
+import numpy as np
+from PIL import Image
 
+from app.utils.calculate_angles import calculate_angles
 from app.utils.process_video import process_video_to_csv, get_next_sequence_path
+from app.utils.judge import judge
+from app.utils.process_image import process_image
+from app.utils.select_exercise import select_exercise
 
 router = APIRouter(
     prefix="/trace",
     tags=["trace"]
 )
+
+@router.post("/realtime/{exercise}")
+async def compute_realtime(exercise:str, frame: UploadFile = File(...)):
+    image = Image.open(frame.file)
+
+    image = np.array(image)
+    
+    selected_exercise = select_exercise(exercise)
+    
+    landmarks = process_image(image)
+
+    left, right = calculate_angles(landmarks)
+    
+    feedbacks = judge(left, right, selected_exercise)
+
+    return {
+        "feedbacks": feedbacks
+    }
 
 @router.post("/{user_id}/{exercise_id}")
 async def trace(user_id: str, exercise_id: str, video: UploadFile = File(...)):
