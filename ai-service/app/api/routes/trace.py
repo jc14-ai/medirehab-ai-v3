@@ -13,6 +13,8 @@ from app.utils.process_video import process_video_to_csv, get_next_sequence_path
 from app.utils.judge import judge
 from app.utils.process_image import process_image
 from app.utils.select_exercise import select_exercise
+from app.utils.exercise_config import get_exercise_config
+from app.utils.session_manager import session_manager
 
 router = APIRouter(
     prefix="/trace",
@@ -20,21 +22,34 @@ router = APIRouter(
 )
 
 @router.post("/realtime/{exercise}")
-async def compute_realtime(exercise:str, frame: UploadFile = File(...)):
+async def compute_realtime(exercise: str, session_id: str = "default", frame: UploadFile = File(...)):
     image = Image.open(frame.file)
 
     image = np.array(image)
     
-    selected_exercise = select_exercise(exercise)
+    selected_exercise = get_exercise_config(exercise)
     
     landmarks = process_image(image)
+    if not landmarks:
+        return {
+            "feedbacks": ["No person detected. Please stand in frame."],
+            "current_phase": "UNKNOWN"
+        }
 
     left, right = calculate_angles(landmarks)
     
-    feedbacks = judge(left, right, selected_exercise)
+    # Retrieve or create session for the user
+    session = session_manager.get_or_create_session(session_id, exercise)
+    
+    feedbacks = judge(left, right, selected_exercise, session=session)
 
     return {
-        "feedbacks": feedbacks
+        "feedbacks": feedbacks,
+        "current_phase": session.current_phase_id,
+        "angles": {
+            "left": left,
+            "right": right
+        }
     }
 
 @router.post("/{user_id}/{exercise_id}")
