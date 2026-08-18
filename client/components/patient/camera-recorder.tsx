@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
 
 interface CameraRecorderProps {
     exerciseName?: string;
@@ -20,12 +19,96 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const [error, setError] = useState<string | null>(null);
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [evaluationScore, setEvaluationScore] = useState<number | null>(null);
+    const [realtimeFeedbacks, setRealtimeFeedbacks] = useState<string[]>([]);
+    const [currentPhase, setCurrentPhase] = useState<string>("");
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [isCheckInOpen, setIsCheckInOpen] = useState(false);
+    const [checkIn, setCheckIn] = useState({
+        painLevel: 0,
+        difficultyLevel: 0,
+        confidenceLevel: 10,
+        note: "",
+    });
+    const [isSubmittingCheckIn, setIsSubmittingCheckIn] = useState(false);
+    const [checkInMessage, setCheckInMessage] = useState<string | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const blobRef = useRef<Blob | null>(null);
+    const realtimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const sessionIdRef = useRef<string>("");
+
+    // Real-time feedback frame capture effect
+    useEffect(() => {
+        if (isRecording) {
+            setRealtimeFeedbacks([]);
+            setCurrentPhase("START");
+            sessionIdRef.current = assignmentId || Math.random().toString(36).substring(7);
+
+            const sendFrame = async () => {
+                const video = videoRef.current;
+                if (!video || video.paused || video.ended) return;
+
+                const canvas = document.createElement("canvas");
+                canvas.width = video.videoWidth || 640;
+                canvas.height = video.videoHeight || 360;
+
+                const ctx = canvas.getContext("2d");
+                if (!ctx) return;
+
+                // Draw current frame
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                canvas.toBlob(async (blob) => {
+                    if (!blob) return;
+
+                    const formData = new FormData();
+                    formData.append("frame", blob, "frame.jpg");
+
+                    try {
+                        // If exerciseId is numeric or generic, let's map it or use the configuration key
+                        let exerciseParam = exerciseId;
+                        if (exerciseId === "1") {
+                            exerciseParam = "shoulder_flexion";
+                        }
+                        const url = `http://localhost:8000/trace/realtime/${exerciseParam}?session_id=${sessionIdRef.current}`;
+                        const res = await fetch(url, {
+                            method: "POST",
+                            body: formData,
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.feedbacks) {
+                                setRealtimeFeedbacks(data.feedbacks);
+                            }
+                            if (data.current_phase) {
+                                setCurrentPhase(data.current_phase);
+                            }
+                        }
+                    } catch (err) {
+                        console.error("Error sending real-time frame:", err);
+                    }
+                }, "image/jpeg", 0.6);
+            };
+
+            // Capture and analyze frame every 750ms
+            realtimeIntervalRef.current = setInterval(sendFrame, 750);
+        } else {
+            if (realtimeIntervalRef.current) {
+                clearInterval(realtimeIntervalRef.current);
+                realtimeIntervalRef.current = null;
+            }
+        }
+
+        return () => {
+            if (realtimeIntervalRef.current) {
+                clearInterval(realtimeIntervalRef.current);
+                realtimeIntervalRef.current = null;
+            }
+        };
+    }, [isRecording, exerciseId, assignmentId]);
 
     // Clean up streams on unmount or close
     useEffect(() => {
@@ -87,6 +170,16 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         setIsEvaluating(false);
         setEvaluationScore(null);
         blobRef.current = null;
+        setSessionId(null);
+        setIsCheckInOpen(false);
+        setCheckIn({
+            painLevel: 0,
+            difficultyLevel: 0,
+            confidenceLevel: 10,
+            note: "",
+        });
+        setIsSubmittingCheckIn(false);
+        setCheckInMessage(null);
     };
 
     const initiateCountdown = () => {
@@ -166,6 +259,14 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             const res = await api.evaluateExercise(exerciseId, assignmentId, blobRef.current);
             if (res.success) {
                 setEvaluationScore(res.score);
+                setSessionId(res.sessionId);
+                try {
+                    await api.updateSessionFeedback(res.sessionId, realtimeFeedbacks);
+                } catch (feedbackErr: any) {
+                    console.warn("Failed to save AI feedback:", feedbackErr);
+                }
+                setIsOpen(false);
+                setIsCheckInOpen(true);
             } else {
                 setError(res.message || "Failed to evaluate exercise.");
             }
@@ -175,6 +276,50 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         } finally {
             setIsEvaluating(false);
         }
+    };
+
+    const handleSubmitCheckIn = async () => {
+        if (!sessionId) {
+            setError("No session was created for this exercise.");
+            return;
+        }
+
+        setIsSubmittingCheckIn(true);
+        setError(null);
+
+        try {
+            await api.submitCheckIn(sessionId, checkIn);
+            setCheckInMessage("Check-in saved for your doctor.");
+        } catch (err: any) {
+            console.error("Check-in error:", err);
+            setError(err.message || "Unable to submit your check-in.");
+        } finally {
+            setIsSubmittingCheckIn(false);
+        }
+    };
+
+    const handleCloseCheckIn = () => {
+        setIsCheckInOpen(false);
+        setEvaluationScore(null);
+        setSessionId(null);
+        setCheckInMessage(null);
+        setCheckIn({
+            painLevel: 0,
+            difficultyLevel: 0,
+            confidenceLevel: 10,
+            note: "",
+        });
+        setRealtimeFeedbacks([]);
+    };
+
+    const updateCheckInField = (
+        field: "painLevel" | "difficultyLevel" | "confidenceLevel",
+        value: number
+    ) => {
+        setCheckIn((current) => ({
+            ...current,
+            [field]: value,
+        }));
     };
 
     return (
@@ -278,31 +423,8 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                     {error}
                                 </div>
                             ) : evaluationScore !== null ? (
-                                /* Evaluation Success Screen */
-                                <div style={{ color: "#FFF", padding: "40px 24px", textAlign: "center" }}>
-                                    <div style={{
-                                        width: "80px",
-                                        height: "80px",
-                                        borderRadius: "50%",
-                                        backgroundColor: "rgba(22, 163, 74, 0.2)",
-                                        border: "3px solid #16A34A",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        margin: "0 auto 20px auto",
-                                        color: "#16A34A"
-                                    }}>
-                                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                            <polyline points="20 6 9 17 4 12"></polyline>
-                                        </svg>
-                                    </div>
-                                    <h4 style={{ fontSize: "20px", fontWeight: 700, margin: "0 0 8px 0" }}>Evaluation Complete!</h4>
-                                    <p style={{ color: "rgba(255,255,255,0.7)", margin: "0 0 16px 0", fontSize: "14px" }}>
-                                        Your exercise performance has been evaluated.
-                                    </p>
-                                    <div style={{ fontSize: "48px", fontWeight: 800, color: "#16A34A", margin: "16px 0" }}>
-                                        {evaluationScore} <span style={{ fontSize: "20px", fontWeight: 500, color: "rgba(255,255,255,0.5)" }}>/ 100</span>
-                                    </div>
+                                <div style={{ color: "var(--color-text-primary)", fontSize: "14px", textAlign: "center" }}>
+                                    Evaluation complete.
                                 </div>
                             ) : recordedUrl ? (
                                 /* Post-Recording Preview */
@@ -381,6 +503,71 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                         </div>
                                     )}
 
+                                    {/* Real-time Phase Badge */}
+                                    {isRecording && currentPhase && (
+                                        <div
+                                            style={{
+                                                position: "absolute",
+                                                top: "16px",
+                                                right: "16px",
+                                                backgroundColor: "rgba(15, 23, 42, 0.8)",
+                                                backdropFilter: "blur(4px)",
+                                                padding: "6px 12px",
+                                                borderRadius: "9999px",
+                                                fontSize: "12px",
+                                                fontWeight: 600,
+                                                color: "#10B981",
+                                                border: "1px solid rgba(16, 185, 129, 0.3)",
+                                                zIndex: 10,
+                                            }}
+                                        >
+                                            Phase: {
+                                                currentPhase === "START" ? "Starting Position" :
+                                                currentPhase === "ASCENT" ? "Raising Arms" :
+                                                currentPhase === "PEAK" ? "Hold Position" :
+                                                currentPhase === "DESCENT" ? "Lowering Arms" :
+                                                currentPhase === "UNKNOWN" ? "Detecting alignment..." : currentPhase
+                                            }
+                                        </div>
+                                    )}
+
+                                    {/* Real-time Corrective Feedback Overlay */}
+                                    {isRecording && (
+                                        <div
+                                            style={{
+                                                position: "absolute",
+                                                bottom: "24px",
+                                                left: "50%",
+                                                transform: "translateX(-50%)",
+                                                width: "90%",
+                                                maxWidth: "500px",
+                                                backgroundColor: realtimeFeedbacks.length > 0 ? "rgba(239, 68, 68, 0.9)" : "rgba(16, 185, 129, 0.85)",
+                                                backdropFilter: "blur(6px)",
+                                                padding: "12px 18px",
+                                                borderRadius: "12px",
+                                                color: "#FFF",
+                                                textAlign: "center",
+                                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
+                                                zIndex: 10,
+                                                transition: "all 0.3s ease",
+                                            }}
+                                        >
+                                            {realtimeFeedbacks.length > 0 ? (
+                                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                                    {realtimeFeedbacks.map((fb, idx) => (
+                                                        <div key={idx} style={{ fontSize: "14px", fontWeight: 700 }}>
+                                                            ⚠️ {fb}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div style={{ fontSize: "14px", fontWeight: 700 }}>
+                                                    ✨ Form alignment looks great! Keep it up.
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
                                     {/* Countdown Timer Overlay */}
                                     {countdown !== null && (
                                         <div
@@ -434,7 +621,6 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                     className="btn btn-primary"
                                     onClick={() => {
                                         handleClose();
-                                        window.location.reload();
                                     }}
                                     style={{ minWidth: "140px" }}
                                 >
@@ -511,6 +697,138 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                     Start Recording
                                 </button>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isCheckInOpen && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        backgroundColor: "rgba(15, 23, 42, 0.45)",
+                        backdropFilter: "blur(3px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 10000,
+                        padding: "20px",
+                    }}
+                    onClick={handleCloseCheckIn}
+                >
+                    <div
+                        className="card animate-slide-up"
+                        style={{
+                            width: "100%",
+                            maxWidth: "640px",
+                            backgroundColor: "#FFFFFF",
+                            borderRadius: "20px",
+                            boxShadow: "0 20px 60px rgba(15, 23, 42, 0.16)",
+                            border: "1px solid rgba(226, 232, 240, 0.9)",
+                            overflow: "hidden",
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div style={{ padding: "22px 22px 18px 22px", borderBottom: "1px solid var(--color-border)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" }}>
+                                <div>
+                                    <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: "6px" }}>
+                                        Post Exercise Check-in
+                                    </div>
+                                    <h3 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "var(--color-text-primary)" }}>
+                                        How did that session feel?
+                                    </h3>
+                                    <p style={{ margin: "8px 0 0 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                                        Share a quick self-report for your doctor after scoring {evaluationScore ?? 0}/100.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleCloseCheckIn}
+                                    className="btn btn-secondary"
+                                    style={{ height: "36px", width: "36px", padding: 0, minWidth: 0 }}
+                                    aria-label="Close check-in"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ padding: "20px 22px 22px 22px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
+                                {[
+                                    {
+                                        key: "painLevel",
+                                        label: "Pain",
+                                        value: checkIn.painLevel,
+                                        helper: "0 = none, 10 = severe",
+                                    },
+                                    {
+                                        key: "difficultyLevel",
+                                        label: "Difficulty",
+                                        value: checkIn.difficultyLevel,
+                                        helper: "How hard the movement felt",
+                                    },
+                                    {
+                                        key: "confidenceLevel",
+                                        label: "Confidence",
+                                        value: checkIn.confidenceLevel,
+                                        helper: "How ready you feel to repeat it",
+                                    },
+                                ].map((item) => (
+                                    <label key={item.key} style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px", minWidth: 0 }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center" }}>
+                                            <span style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{item.label}</span>
+                                            <span className="badge badge-blue">{item.value}/10</span>
+                                        </div>
+                                        <input
+                                            className="input"
+                                            type="range"
+                                            min={0}
+                                            max={10}
+                                            value={item.value}
+                                            onChange={(event) => updateCheckInField(item.key as "painLevel" | "difficultyLevel" | "confidenceLevel", Number(event.target.value))}
+                                            style={{ height: "28px", padding: 0, background: "transparent" }}
+                                        />
+                                        <div style={{ fontSize: "12px", color: "var(--color-text-muted)", lineHeight: 1.3 }}>
+                                            {item.helper}
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+
+                            <label style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px", minWidth: 0 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center" }}>
+                                    <span style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>Notes for your doctor</span>
+                                    <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Optional</span>
+                                </div>
+                                <textarea
+                                    className="input"
+                                    value={checkIn.note}
+                                    onChange={(event) => setCheckIn((current) => ({ ...current, note: event.target.value }))}
+                                    placeholder="Any pain, stiffness, or issues you want your doctor to know?"
+                                    style={{ minHeight: "86px", resize: "vertical", paddingTop: "10px", width: "100%", minWidth: 0 }}
+                                />
+                            </label>
+
+                            {checkInMessage && (
+                                <div style={{ padding: "10px 12px", borderRadius: "12px", backgroundColor: "#DCFCE7", color: "#166534", fontSize: "13px" }}>
+                                    {checkInMessage}
+                                </div>
+                            )}
+
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" }}>
+                                <button className="btn btn-secondary" type="button" onClick={handleCloseCheckIn}>
+                                    Close
+                                </button>
+                                <button className="btn btn-primary" onClick={handleSubmitCheckIn} disabled={isSubmittingCheckIn} style={{ minWidth: "150px", height: "40px" }}>
+                                    {isSubmittingCheckIn ? "Saving..." : "Submit Check-in"}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
