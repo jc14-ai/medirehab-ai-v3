@@ -67,6 +67,55 @@ export interface ExerciseResult {
   score: number;
 }
 
+export interface SessionAuthor {
+  id: string;
+  email: string;
+  role: "ADMIN" | "DOCTOR" | "PATIENT";
+  displayName: string;
+}
+
+export interface SessionComment {
+  id: string;
+  body: string;
+  isVisibleToPatient: boolean;
+  createdAt: string;
+  updatedAt: string;
+  author: SessionAuthor;
+}
+
+export interface CareSession {
+  id: string;
+  score: number | null;
+  aiFeedback: string[];
+  painLevel: number | null;
+  difficultyLevel: number | null;
+  confidenceLevel: number | null;
+  patientNote: string | null;
+  performedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  assignment: {
+    id: string;
+    assignedAt: string;
+    archivedAt: string | null;
+    exercise: ApiExercise;
+    result?: ExerciseResult;
+  };
+  comments: SessionComment[];
+}
+
+export interface CareNotification {
+  id: string;
+  type: "SESSION_RESULT" | "SESSION_CHECKIN" | "DOCTOR_COMMENT" | "REMINDER";
+  title: string;
+  body: string;
+  link: string | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ExerciseAssignment {
   id: string;
   assignedAt: string;
@@ -341,12 +390,52 @@ export const api = {
   },
 
   evaluateExercise(exerciseId: string, assignmentId: string, videoBlob: Blob) {
-    return request<{ success: boolean; score: number; message?: string }>(`/exercises/patients/exercises/${exerciseId}/assignments/${assignmentId}/evaluate`, {
+    return request<{ success: boolean; score: number; sessionId: string; message?: string }>(`/exercises/patients/exercises/${exerciseId}/assignments/${assignmentId}/evaluate`, {
       method: "POST",
       headers: {
         "Content-Type": videoBlob.type || "video/webm",
       },
       body: videoBlob,
+    });
+  },
+
+  // --- Care Timeline & Notifications ---
+  getMySessions() {
+    return request<{ success: boolean; sessions: CareSession[] }>("/care/me/sessions");
+  },
+
+  getPatientSessions(patientUserId: string) {
+    return request<{ success: boolean; sessions: CareSession[] }>(`/care/patients/${patientUserId}/sessions`);
+  },
+
+  updateSessionFeedback(sessionId: string, aiFeedback: string[]) {
+    return request<{ success: boolean; session: CareSession }>(`/care/sessions/${sessionId}/feedback`, {
+      method: "PATCH",
+      body: JSON.stringify({ aiFeedback }),
+    });
+  },
+
+  submitCheckIn(sessionId: string, data: { painLevel: number; difficultyLevel: number; confidenceLevel: number; note?: string }) {
+    return request<{ success: boolean; session: CareSession }>(`/care/sessions/${sessionId}/check-in`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  addDoctorComment(sessionId: string, body: string) {
+    return request<{ success: boolean; comment: SessionComment }>(`/care/sessions/${sessionId}/comments`, {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    });
+  },
+
+  getMyNotifications() {
+    return request<{ success: boolean; notifications: CareNotification[] }>("/care/notifications");
+  },
+
+  markNotificationRead(notificationId: string) {
+    return request<{ success: boolean; notification: CareNotification }>(`/care/notifications/${notificationId}/read`, {
+      method: "PATCH",
     });
   },
 };
