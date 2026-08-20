@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { api, ApiError, type ExerciseAssignment } from "@/lib/api";
+import { api, ApiError, type CareNotification, type CareSession, type ExerciseAssignment } from "@/lib/api";
 import { MyExerciseList } from "@/components/patient/my-exercise-list";
+import { CareTimeline } from "@/components/care/care-timeline";
+import { NotificationsPanel } from "@/components/care/notifications-panel";
 
 export default function PatientExercisesPage() {
   const [assignments, setAssignments] = useState<ExerciseAssignment[]>([]);
+  const [sessions, setSessions] = useState<CareSession[]>([]);
+  const [notifications, setNotifications] = useState<CareNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -15,8 +19,16 @@ export default function PatientExercisesPage() {
 
     async function loadExercises() {
       try {
-        const res = await api.getMyAssignedExercises();
-        if (mounted) setAssignments(res.assignments);
+        const [assignedRes, sessionsRes, notificationsRes] = await Promise.all([
+          api.getMyAssignedExercises(),
+          api.getMySessions(),
+          api.getMyNotifications(),
+        ]);
+        if (mounted) {
+          setAssignments(assignedRes.assignments);
+          setSessions(sessionsRes.sessions);
+          setNotifications(notificationsRes.notifications);
+        }
       } catch (err) {
         if (mounted) setError(err instanceof ApiError ? err.message : "Failed to load assigned exercises.");
       } finally {
@@ -74,6 +86,24 @@ export default function PatientExercisesPage() {
           <MyExerciseList assignments={filteredAssignments}/>
         )}
       </div>
+
+      <section className="doctor-two-column">
+        <div className="card" style={{ padding: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", marginBottom: "18px", flexWrap: "wrap" }}>
+            <h2 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>Care Timeline</h2>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{sessions.length} session{sessions.length === 1 ? "" : "s"}</span>
+          </div>
+          <CareTimeline sessions={sessions} role="patient" />
+        </div>
+
+        <div className="card" style={{ padding: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", marginBottom: "18px", flexWrap: "wrap" }}>
+            <h2 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>Notifications</h2>
+            <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{notifications.filter((notification) => !notification.isRead).length} unread</span>
+          </div>
+          <NotificationsPanel notifications={notifications.slice(0, 5)} />
+        </div>
+      </section>
     </div>
   );
 }

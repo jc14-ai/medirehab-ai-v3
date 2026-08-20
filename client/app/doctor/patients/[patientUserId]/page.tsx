@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, ApiError, type ApiPatient, type ExerciseAssignment, type PatientProfile } from "@/lib/api";
+import { api, ApiError, type ApiPatient, type CareSession, type ExerciseAssignment, type PatientProfile } from "@/lib/api";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { PatientForm } from "@/components/doctor/patient-form";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TemporaryPasswordDialog } from "@/components/ui/temporary-password-dialog";
+import { CareTimeline } from "@/components/care/care-timeline";
 
 function ActivityIcon() {
   return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>;
@@ -38,10 +39,12 @@ export default function PatientDetailPage() {
   const patientUserId = params.patientUserId;
   const [patient, setPatient] = useState<ApiPatient | null>(null);
   const [assignments, setAssignments] = useState<ExerciseAssignment[]>([]);
+  const [sessions, setSessions] = useState<CareSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
+  const [commentLoading, setCommentLoading] = useState(false);
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [isTemporaryPasswordOpen, setIsTemporaryPasswordOpen] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState({
@@ -58,12 +61,14 @@ export default function PatientDetailPage() {
     setLoading(true);
     setError("");
     try {
-      const [patientRes, assignmentsRes] = await Promise.all([
+      const [patientRes, assignmentsRes, sessionsRes] = await Promise.all([
         api.getPatient(patientUserId),
         api.getAssignedExercises(patientUserId),
+        api.getPatientSessions(patientUserId),
       ]);
       setPatient(patientRes.patient);
       setAssignments(assignmentsRes.assignments);
+      setSessions(sessionsRes.sessions);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load patient.");
     } finally {
@@ -87,6 +92,18 @@ export default function PatientDetailPage() {
       alert(err instanceof ApiError ? err.message : "Failed to update patient.");
     } finally {
       setFormLoading(false);
+    }
+  };
+
+  const handleAddComment = async (sessionId: string, body: string) => {
+    setCommentLoading(true);
+    try {
+      await api.addDoctorComment(sessionId, body);
+      await loadPatient();
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to add comment.");
+    } finally {
+      setCommentLoading(false);
     }
   };
 
@@ -231,6 +248,14 @@ export default function PatientDetailPage() {
             </div>
           )}
         </div>
+      </section>
+
+      <section className="card" style={{ padding: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", marginBottom: "18px", flexWrap: "wrap" }}>
+          <h2 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>Care Timeline</h2>
+          <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{sessions.length} session{sessions.length === 1 ? "" : "s"}</span>
+        </div>
+        <CareTimeline sessions={sessions} role="doctor" onCommentSubmit={handleAddComment} isBusy={commentLoading} />
       </section>
 
       <PatientForm isOpen={isFormOpen} initialData={patient} onSave={handleSavePatient} onCancel={() => setIsFormOpen(false)} isLoading={formLoading} />

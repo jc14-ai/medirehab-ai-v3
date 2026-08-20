@@ -11,6 +11,7 @@ import {
     updateExercise,
     evaluateExercise
 } from "../services/exercise.service";
+import { recordExerciseSession } from "../services/care.service";
 import { HttpError } from "../utils/httpError";
 import {
     validateAssignExerciseInput,
@@ -250,10 +251,18 @@ export const evaluateExerciseAssignment = async (
                     videoBuffer
                 );
 
+                const session = await recordExerciseSession(
+                    authenticatedUserId,
+                    assignmentId,
+                    exerciseId,
+                    result.score
+                );
+
                 res.status(200).json({
                     success: true,
                     message: "Exercise evaluated successfully.",
-                    ...result
+                    ...result,
+                    sessionId: session.id
                 });
             } catch (innerError) {
                 handleExerciseError(innerError, res, "Error evaluating exercise recording.");
