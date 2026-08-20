@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, ApiError, type ExerciseAssignment, type PatientProfile } from "@/lib/api";
+import { api, ApiError, type CareNotification, type ExerciseAssignment, type PatientProfile } from "@/lib/api";
 import { StatCard } from "@/components/ui/stat-card";
 import { MyExerciseList } from "@/components/patient/my-exercise-list";
+import { NotificationsPanel } from "@/components/care/notifications-panel";
 
 function ActivityIcon() {
   return (
@@ -26,6 +27,7 @@ function UserIcon() {
 export default function PatientDashboardPage() {
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const [assignments, setAssignments] = useState<ExerciseAssignment[]>([]);
+  const [notifications, setNotifications] = useState<CareNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -34,14 +36,16 @@ export default function PatientDashboardPage() {
 
     async function loadDashboard() {
       try {
-        const [profileRes, assignedRes] = await Promise.all([
+        const [profileRes, assignedRes, notificationsRes] = await Promise.all([
           api.getProfile(),
           api.getMyAssignedExercises(),
+          api.getMyNotifications(),
         ]);
 
         if (mounted) {
           setProfile((profileRes.user.profile as PatientProfile) ?? null);
           setAssignments(assignedRes.assignments);
+          setNotifications(notificationsRes.notifications);
         }
       } catch (err) {
         if (mounted) setError(err instanceof ApiError ? err.message : "Failed to load dashboard.");
@@ -123,6 +127,14 @@ export default function PatientDashboardPage() {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="card" style={{ padding: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", marginBottom: "18px", flexWrap: "wrap" }}>
+          <h2 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>Notifications</h2>
+          <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{notifications.filter((notification) => !notification.isRead).length} unread</span>
+        </div>
+        <NotificationsPanel notifications={notifications.slice(0, 4)} />
       </section>
     </div>
   );

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, ApiError, type ApiPatient, type DoctorProfile, type ExerciseAssignment } from "@/lib/api";
+import { api, ApiError, type ApiPatient, type CareNotification, type DoctorProfile, type ExerciseAssignment } from "@/lib/api";
 import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { NotificationsPanel } from "@/components/care/notifications-panel";
 
 function UsersIcon() {
   return <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></svg>;
@@ -22,6 +23,7 @@ export default function DoctorDashboardPage() {
   const [profile, setProfile] = useState<DoctorProfile | null>(null);
   const [patients, setPatients] = useState<ApiPatient[]>([]);
   const [assignmentsByPatient, setAssignmentsByPatient] = useState<Record<string, ExerciseAssignment[]>>({});
+  const [notifications, setNotifications] = useState<CareNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -30,7 +32,7 @@ export default function DoctorDashboardPage() {
 
     async function loadDashboard() {
       try {
-        const [profileRes, patientsRes] = await Promise.all([api.getProfile(), api.getPatients()]);
+        const [profileRes, patientsRes, notificationsRes] = await Promise.all([api.getProfile(), api.getPatients(), api.getMyNotifications()]);
         const assignmentEntries = await Promise.all(
           patientsRes.patients.map(async (patient) => {
             try {
@@ -46,6 +48,7 @@ export default function DoctorDashboardPage() {
           setProfile((profileRes.user.profile as DoctorProfile) ?? null);
           setPatients(patientsRes.patients);
           setAssignmentsByPatient(Object.fromEntries(assignmentEntries));
+          setNotifications(notificationsRes.notifications);
         }
       } catch (err) {
         if (mounted) setError(err instanceof ApiError ? err.message : "Failed to load dashboard data.");
@@ -136,6 +139,14 @@ export default function DoctorDashboardPage() {
             <Link className="btn btn-secondary btn-full" href="/doctor/profile">Update profile</Link>
           </div>
         </div>
+      </section>
+
+      <section className="card" style={{ padding: "24px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "center", marginBottom: "18px", flexWrap: "wrap" }}>
+          <h2 style={{ fontSize: "18px", fontWeight: 600, margin: 0 }}>Notifications</h2>
+          <span style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{notifications.filter((notification) => !notification.isRead).length} unread</span>
+        </div>
+        <NotificationsPanel notifications={notifications.slice(0, 4)} />
       </section>
     </div>
   );
