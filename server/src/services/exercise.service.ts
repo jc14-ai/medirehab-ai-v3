@@ -328,8 +328,11 @@ type AiServiceResponse = {
     success?: boolean;
     message?: string;
     detail?: string;
+    evaluationId?: string;
     score?: unknown;
 };
+
+const DEFAULT_AI_SERVICE_TIMEOUT_MS = 120_000;
 
 const getAiServiceBaseUrl = (): string => {
     const configuredUrl = process.env.AI_SERVICE_URL?.trim();
@@ -342,6 +345,52 @@ const getAiServiceBaseUrl = (): string => {
         return new URL(configuredUrl).toString().replace(/\/$/, "");
     } catch {
         throw new HttpError(503, "Exercise evaluation service is not configured.");
+    }
+};
+
+const getAiServiceTimeoutMs = (): number => {
+    const configuredTimeout = process.env.AI_SERVICE_TIMEOUT_MS?.trim();
+
+    if (!configuredTimeout) {
+        return DEFAULT_AI_SERVICE_TIMEOUT_MS;
+    }
+
+    const timeoutMs = Number(configuredTimeout);
+
+    if (
+        !Number.isInteger(timeoutMs)
+        || timeoutMs < 1_000
+        || timeoutMs > 600_000
+    ) {
+        throw new HttpError(503, "Exercise evaluation timeout is not configured correctly.");
+    }
+
+    return timeoutMs;
+};
+
+const fetchAiService = async (
+    url: string,
+    requestInit: RequestInit
+): Promise<Response> => {
+    const abortController = new AbortController();
+    const timeout = setTimeout(
+        () => abortController.abort(),
+        getAiServiceTimeoutMs()
+    );
+
+    try {
+        return await fetch(url, {
+            ...requestInit,
+            signal: abortController.signal
+        });
+    } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+            throw new HttpError(504, "Exercise evaluation timed out. Please try again.");
+        }
+
+        throw new HttpError(502, "Exercise evaluation service is unavailable.");
+    } finally {
+        clearTimeout(timeout);
     }
 };
 
@@ -364,7 +413,8 @@ export const evaluateExercise = async (
     patientUserId: string,
     exerciseId: string,
     assignmentId: string,
-    videoBuffer: Buffer
+    videoBuffer: Buffer,
+    videoContentType: string
 ) => {
     const assignment = await prisma.exerciseAssignment.findFirst({
         where: {
@@ -407,37 +457,26 @@ export const evaluateExercise = async (
     const formData = new FormData();
     formData.append(
         "video",
-        new Blob([uint8Array], { type: "video/webm" }),
+        new Blob([uint8Array], { type: videoContentType }),
         "exercise.webm"
     );
 
     const aiServiceBaseUrl = getAiServiceBaseUrl();
-    const encodedPatientUserId = encodeURIComponent(patientUserId);
     const encodedModelKey = encodeURIComponent(modelKey);
-    const traceResponse = await fetch(
-        `${aiServiceBaseUrl}/trace/${encodedPatientUserId}/${encodedModelKey}`,
+    const evaluationResponse = await fetchAiService(
+        `${aiServiceBaseUrl}/evaluate/${encodedModelKey}`,
         {
             method: "POST",
             body: formData
         }
     );
-    const traceResult = await readAiServiceResponse(traceResponse);
-
-    if (!traceResponse.ok || traceResult.success !== true) {
-        throw new HttpError(
-            502,
-            getAiServiceErrorMessage(traceResult, "Failed to trace exercise recording.")
-        );
-    }
-
-    const evaluationResponse = await fetch(
-        `${aiServiceBaseUrl}/evaluate/${encodedPatientUserId}/${encodedModelKey}`
-    );
     const evaluationResult = await readAiServiceResponse(evaluationResponse);
 
     if (!evaluationResponse.ok || evaluationResult.success !== true) {
         throw new HttpError(
-            502,
+            evaluationResponse.status >= 400 && evaluationResponse.status < 500
+                ? evaluationResponse.status
+                : 502,
             getAiServiceErrorMessage(evaluationResult, "Failed to evaluate exercise.")
         );
     }

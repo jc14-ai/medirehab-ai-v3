@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { useAuth } from "@/lib/auth-context";
+import { useSideArmsRaiseGuidance } from "@/hooks/use-side-arms-raise-guidance";
+import { supportsSideArmsRaiseGuidance } from "@/lib/pose/side-arms-raise-guidance";
 
 interface CameraRecorderProps {
     exerciseName?: string;
@@ -10,6 +11,8 @@ interface CameraRecorderProps {
     assignmentId?: string;
     onSave?: (blob: Blob) => void;
 }
+
+const MAX_RECORDING_SECONDS = 20;
 
 export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignmentId, onSave}: CameraRecorderProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -22,10 +25,22 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const [evaluationScore, setEvaluationScore] = useState<number | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
+    const poseCanvasRef = useRef<HTMLCanvasElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const blobRef = useRef<Blob | null>(null);
+    const liveGuidanceEnabled =
+        isOpen &&
+        Boolean(stream) &&
+        !recordedUrl &&
+        supportsSideArmsRaiseGuidance(exerciseName);
+    const liveGuidance = useSideArmsRaiseGuidance(
+        liveGuidanceEnabled,
+        videoRef,
+        poseCanvasRef,
+    );
 
     // Clean up streams on unmount or close
     useEffect(() => {
@@ -36,6 +51,9 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             if (countdownIntervalRef.current) {
                 clearInterval(countdownIntervalRef.current);
             }
+            if (recordingTimeoutRef.current) {
+                clearTimeout(recordingTimeoutRef.current);
+            }
         };
     }, [stream]);
 
@@ -44,14 +62,19 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         setRecordedUrl(null);
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "user" },
+                video: {
+                    facingMode: "user",
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    frameRate: { ideal: 10 },
+                },
                 audio: false
             });
             setStream(mediaStream);
             if (videoRef.current) {
                 videoRef.current.srcObject = mediaStream;
             }
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error("Error accessing camera:", err);
             setError(
                 "Could not access your front camera. Please check your camera permissions and ensure no other application is using it."
@@ -78,6 +101,10 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         stopCamera();
         if (countdownIntervalRef.current) {
             clearInterval(countdownIntervalRef.current);
+        }
+        if (recordingTimeoutRef.current) {
+            clearTimeout(recordingTimeoutRef.current);
+            recordingTimeoutRef.current = null;
         }
         setCountdown(null);
         setIsRecording(false);
@@ -115,7 +142,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             let recorder: MediaRecorder;
             try {
                 recorder = new MediaRecorder(stream, options);
-            } catch (e) {
+            } catch {
                 // Fallback for browsers that don't support VP9
                 recorder = new MediaRecorder(stream);
             }
@@ -127,6 +154,10 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             };
 
             recorder.onstop = () => {
+                if (recordingTimeoutRef.current) {
+                    clearTimeout(recordingTimeoutRef.current);
+                    recordingTimeoutRef.current = null;
+                }
                 const mimeType = recorder.mimeType || "video/webm";
                 const blob = new Blob(chunksRef.current, { type: mimeType });
                 blobRef.current = blob;
@@ -141,6 +172,12 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             mediaRecorderRef.current = recorder;
             recorder.start(); // Start recording without timeslice for maximum stability
             setIsRecording(true);
+            recordingTimeoutRef.current = setTimeout(() => {
+                if (recorder.state === "recording") {
+                    recorder.stop();
+                    setIsRecording(false);
+                }
+            }, MAX_RECORDING_SECONDS * 1000);
         } catch (err) {
             console.error("Failed to start recording:", err);
             setError("Failed to initialize video recording.");
@@ -148,6 +185,10 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     };
 
     const stopRecording = () => {
+        if (recordingTimeoutRef.current) {
+            clearTimeout(recordingTimeoutRef.current);
+            recordingTimeoutRef.current = null;
+        }
         if (mediaRecorderRef.current && isRecording) {
             mediaRecorderRef.current.stop();
             setIsRecording(false);
@@ -169,9 +210,10 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             } else {
                 setError(res.message || "Failed to evaluate exercise.");
             }
-        } catch (err: any) {
-            console.error("Evaluation error:", err);
-            setError(err.message || "An error occurred during evaluation.");
+        } catch (err: unknown) {
+            const message = getErrorMessage(err, "An error occurred during evaluation.");
+            console.warn("Evaluation request failed:", message);
+            setError(message);
         } finally {
             setIsEvaluating(false);
         }
@@ -348,6 +390,92 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                         }}
                                     />
 
+                                    {liveGuidanceEnabled && (
+                                        <>
+                                            <canvas
+                                                ref={poseCanvasRef}
+                                                aria-hidden="true"
+                                                style={{
+                                                    position: "absolute",
+                                                    inset: 0,
+                                                    width: "100%",
+                                                    height: "100%",
+                                                    pointerEvents: "none",
+                                                    transform: "scaleX(-1)",
+                                                    zIndex: 4,
+                                                }}
+                                            />
+                                            <div
+                                                style={{
+                                                    position: "absolute",
+                                                    top: "16px",
+                                                    right: "16px",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "7px",
+                                                    padding: "6px 10px",
+                                                    borderRadius: "9999px",
+                                                    backgroundColor: "rgba(15, 23, 42, 0.72)",
+                                                    color: "#FFF",
+                                                    fontSize: "12px",
+                                                    fontWeight: 700,
+                                                    zIndex: 10,
+                                                }}
+                                            >
+                                                <span
+                                                    style={{
+                                                        width: "8px",
+                                                        height: "8px",
+                                                        borderRadius: "50%",
+                                                        backgroundColor:
+                                                            liveGuidance.status === "ready"
+                                                                ? "#2DD4BF"
+                                                                : liveGuidance.status === "error"
+                                                                  ? "#F59E0B"
+                                                                  : "#94A3B8",
+                                                    }}
+                                                />
+                                                Live guidance
+                                            </div>
+                                            <div
+                                                aria-live="polite"
+                                                style={{
+                                                    position: "absolute",
+                                                    left: "50%",
+                                                    bottom: "18px",
+                                                    transform: "translateX(-50%)",
+                                                    width: "min(90%, 620px)",
+                                                    padding: "10px 14px",
+                                                    borderRadius: "12px",
+                                                    backgroundColor: liveGuidance.justCompletedRepetition
+                                                        ? "rgba(13, 148, 136, 0.9)"
+                                                        : "rgba(15, 23, 42, 0.78)",
+                                                    color: "#FFF",
+                                                    textAlign: "center",
+                                                    fontSize: "14px",
+                                                    fontWeight: 600,
+                                                    lineHeight: 1.4,
+                                                    zIndex: 10,
+                                                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.22)",
+                                                }}
+                                            >
+                                                <div>{liveGuidance.message}</div>
+                                                {liveGuidance.status === "ready" && (
+                                                    <div
+                                                        style={{
+                                                            marginTop: "3px",
+                                                            color: "rgba(255, 255, 255, 0.72)",
+                                                            fontSize: "11px",
+                                                            fontWeight: 500,
+                                                        }}
+                                                    >
+                                                        Detected repetitions: {liveGuidance.repetitions}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
+
                                     {/* Recording Status Overlay */}
                                     {isRecording && (
                                         <div
@@ -377,7 +505,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                                     display: "inline-block",
                                                 }}
                                             />
-                                            REC
+                                            REC · {MAX_RECORDING_SECONDS}s max
                                         </div>
                                     )}
 
@@ -517,4 +645,8 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             )}
         </>
     );
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error && error.message ? error.message : fallback;
 }
