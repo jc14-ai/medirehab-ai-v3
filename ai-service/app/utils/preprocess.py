@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 
-def preprocess(folder):
+def preprocess(folder, target_frames=200):
     
     dataset = []
 
@@ -13,7 +13,7 @@ def preprocess(folder):
 
     seq = normalize_pose(seq)
     seq = seq.to_numpy(dtype=np.float32)
-    seq = resample_sequence(seq, target_frames=200)
+    seq = resample_sequence(seq, target_frames=target_frames)
 
     dataset.append(seq)
 

@@ -324,14 +324,86 @@ export const archivePatientExerciseAssignment = async (
     });
 };
 
+type AiServiceResponse = {
+    success?: boolean;
+    message?: string;
+    detail?: string;
+    score?: unknown;
+};
+
+const getAiServiceBaseUrl = (): string => {
+    const configuredUrl = process.env.AI_SERVICE_URL?.trim();
+
+    if (!configuredUrl) {
+        throw new HttpError(503, "Exercise evaluation service is not configured.");
+    }
+
+    try {
+        return new URL(configuredUrl).toString().replace(/\/$/, "");
+    } catch {
+        throw new HttpError(503, "Exercise evaluation service is not configured.");
+    }
+};
+
+const readAiServiceResponse = async (
+    response: Response
+): Promise<AiServiceResponse> => {
+    try {
+        return await response.json() as AiServiceResponse;
+    } catch {
+        throw new HttpError(502, "Exercise evaluation service returned an invalid response.");
+    }
+};
+
+const getAiServiceErrorMessage = (
+    response: AiServiceResponse,
+    fallback: string
+): string => response.message ?? response.detail ?? fallback;
+
 export const evaluateExercise = async (
     patientUserId: string,
     exerciseId: string,
     assignmentId: string,
     videoBuffer: Buffer
 ) => {
-    const uint8Array = new Uint8Array(videoBuffer);
+    const assignment = await prisma.exerciseAssignment.findFirst({
+        where: {
+            id: assignmentId,
+            exerciseId,
+            archivedAt: null,
+            patientProfile: {
+                is: { userId: patientUserId }
+            },
+            exercise: {
+                is: {
+                    isActive: true,
+                    archivedAt: null
+                }
+            }
+        },
+        select: {
+            id: true,
+            exercise: {
+                select: { analysisModelKey: true }
+            }
+        }
+    });
 
+    if (!assignment) {
+        throw new HttpError(404, "Assigned exercise not found.");
+    }
+
+    const modelKey = assignment.exercise.analysisModelKey;
+
+    if (!modelKey) {
+        throw new HttpError(409, "Exercise evaluation is not available for this exercise.");
+    }
+
+    if (videoBuffer.length === 0) {
+        throw new HttpError(400, "Exercise recording is empty.");
+    }
+
+    const uint8Array = new Uint8Array(videoBuffer);
     const formData = new FormData();
     formData.append(
         "video",
@@ -339,62 +411,58 @@ export const evaluateExercise = async (
         "exercise.webm"
     );
 
-    const res = await fetch(
-        `http://127.0.0.1:8000/trace/${patientUserId}/${exerciseId}`,
+    const aiServiceBaseUrl = getAiServiceBaseUrl();
+    const encodedPatientUserId = encodeURIComponent(patientUserId);
+    const encodedModelKey = encodeURIComponent(modelKey);
+    const traceResponse = await fetch(
+        `${aiServiceBaseUrl}/trace/${encodedPatientUserId}/${encodedModelKey}`,
         {
             method: "POST",
-            body: formData,
+            body: formData
         }
     );
-    const data = await res.json();
-    
-    let score = 0;
+    const traceResult = await readAiServiceResponse(traceResponse);
 
-    if(data.success) {
-        const res = await fetch(`http://127.0.0.1:8000/evaluate/${patientUserId}/${exerciseId}`);
-        const data = await res.json();
-
-        if(!data.success) {
-            throw new HttpError(500, "Failed to evaluate exercise.");
-        }
-
-        score = data.score;
+    if (!traceResponse.ok || traceResult.success !== true) {
+        throw new HttpError(
+            502,
+            getAiServiceErrorMessage(traceResult, "Failed to trace exercise recording.")
+        );
     }
 
-    // Find patient profile
-    // const patient = await prisma.patientProfile.findUnique({
-    //     where: { userId: patientUserId }
-    // });
+    const evaluationResponse = await fetch(
+        `${aiServiceBaseUrl}/evaluate/${encodedPatientUserId}/${encodedModelKey}`
+    );
+    const evaluationResult = await readAiServiceResponse(evaluationResponse);
 
-    // if (!patient) {
-    //     throw new HttpError(404, "Patient profile not found.");
-    // }
+    if (!evaluationResponse.ok || evaluationResult.success !== true) {
+        throw new HttpError(
+            502,
+            getAiServiceErrorMessage(evaluationResult, "Failed to evaluate exercise.")
+        );
+    }
 
-    // Verify the assignment belongs to this patient and exercise catalog item
-    // const assignment = await prisma.exerciseAssignment.findFirst({
-    //     where: {
-    //         id: assignmentId,
-    //         patientProfileId: patient.id,
-    //         exerciseId: exerciseId
-    //     }
-    // });
+    if (
+        typeof evaluationResult.score !== "number"
+        || !Number.isFinite(evaluationResult.score)
+        || evaluationResult.score < 0
+        || evaluationResult.score > 100
+    ) {
+        throw new HttpError(502, "Exercise evaluation service returned an invalid score.");
+    }
 
-    // if (!assignment) {
-    //     throw new HttpError(404, "Assignment not found.");
-    // }
+    const result = await prisma.exerciseResult.upsert({
+        where: { assignmentId: assignment.id },
+        create: {
+            assignmentId: assignment.id,
+            score: evaluationResult.score
+        },
+        update: {
+            score: evaluationResult.score
+        },
+        select: { score: true }
+    });
 
-    // Update or create the result
-    // const result = await prisma.exerciseResult.upsert({
-    //     where: { assignmentId },
-    //     create: {
-    //         assignmentId,
-    //         score
-    //     },
-    //     update: {
-    //         score
-    //     }
-    // });
-
-    return { score };
+    return { score: result.score };
 };
 

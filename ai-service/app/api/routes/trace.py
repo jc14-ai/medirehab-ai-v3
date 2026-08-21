@@ -1,11 +1,9 @@
 import uuid
 
-from fastapi import APIRouter, UploadFile, File
-from ultralytics import YOLO
-import csv
-import cv2
+from fastapi import APIRouter, UploadFile, File, HTTPException
 import os
 
+from app.model_registry import get_model_definition
 from app.utils.process_video import process_video_to_csv, get_next_sequence_path
 
 router = APIRouter(
@@ -13,10 +11,15 @@ router = APIRouter(
     tags=["trace"]
 )
 
-@router.post("/{user_id}/{exercise_id}")
-async def trace(user_id: str, exercise_id: str, video: UploadFile = File(...)):
-    
-    video_folder = f"data/videos/user_{user_id}/exercise_{exercise_id}"
+
+@router.post("/{user_id}/{model_key}")
+async def trace(user_id: str, model_key: str, video: UploadFile = File(...)):
+    try:
+        get_model_definition(model_key)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+    video_folder = f"data/videos/user_{user_id}/exercise_{model_key}"
     
     os.makedirs(video_folder, exist_ok=True)
     
@@ -24,9 +27,9 @@ async def trace(user_id: str, exercise_id: str, video: UploadFile = File(...)):
     file_path = os.path.join(video_folder, filename)
     
     with open(file_path, "wb") as f:
-        f.write( await video.read())
+        f.write(await video.read())
     
-    output_folder = f"data/trace/user_{user_id}/exercise_{exercise_id}"
+    output_folder = f"data/trace/user_{user_id}/exercise_{model_key}"
     
     os.makedirs(output_folder, exist_ok=True)
     
@@ -38,7 +41,7 @@ async def trace(user_id: str, exercise_id: str, video: UploadFile = File(...)):
                 process_video_to_csv(video_path, output_csv_path)
     else:
         print(f"Input video directory '{video_folder}' not found. Please create it and place your videos there.")
-        print("To run manually, call: process_video_to_csv('data/videos/user_{user_id}/exercise_{exercise_id}/video.mp4', 'data/trace/user_{user_id}/exercise_{exercise_id}/output.csv')")
+        print("The model video directory does not contain a supported recording.")
     
     
     return {
