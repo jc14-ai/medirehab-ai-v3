@@ -4,7 +4,7 @@ import os
 
 from app.utils.build_model import build_model
 from app.utils.preprocess import preprocess
-from app.utils.evaluate import get_reconstruction_error, compute_similarity_score
+from app.utils.evaluate import get_reconstruction_error, compute_similarity_score, get_score_feedback
 
 router = APIRouter(
     prefix="/evaluate",
@@ -47,10 +47,12 @@ def evaluate(user_id: str, exercise_id: str):
         
     error = get_reconstruction_error(model, data)
     score = compute_similarity_score(error, mean_val_loss, beta)
+    feedback = get_score_feedback(score, exercise_id)
         
     return {
         "success": True,
         "message": "Evaluation completed successfully.",
         "error": error,
-        "score": score
+        "score": score,
+        "feedback": feedback
     }

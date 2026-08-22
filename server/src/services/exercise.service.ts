@@ -349,6 +349,7 @@ export const evaluateExercise = async (
     const data = await res.json();
     
     let score = 0;
+    let feedback: string[] = [];
 
     if(data.success) {
         const res = await fetch(`http://127.0.0.1:8000/evaluate/${patientUserId}/${exerciseId}`);
@@ -359,6 +360,7 @@ export const evaluateExercise = async (
         }
 
         score = data.score;
+        feedback = data.feedback || [];
     }
 
     // Find patient profile
@@ -395,6 +397,6 @@ export const evaluateExercise = async (
     //     }
     // });
 
-    return { score };
+    return { score, feedback };
 };
 
