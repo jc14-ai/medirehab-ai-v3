@@ -255,7 +255,8 @@ export const evaluateExerciseAssignment = async (
                     authenticatedUserId,
                     assignmentId,
                     exerciseId,
-                    result.score
+                    result.score,
+                    result.feedback
                 );
 
                 res.status(200).json({
