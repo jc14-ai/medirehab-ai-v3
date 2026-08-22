@@ -69,15 +69,8 @@ async def trace(user_id: str, exercise_id: str, video: UploadFile = File(...)):
     
     os.makedirs(output_folder, exist_ok=True)
     
-    if os.path.exists(video_folder):
-        for filename in sorted(os.listdir(video_folder)):
-            if filename.endswith((".mp4", ".avi", ".mov", ".mkv", ".webm")):
-                video_path = os.path.join(video_folder, filename)
-                output_csv_path = get_next_sequence_path(output_folder)
-                process_video_to_csv(video_path, output_csv_path)
-    else:
-        print(f"Input video directory '{video_folder}' not found. Please create it and place your videos there.")
-        print("To run manually, call: process_video_to_csv('data/videos/user_{user_id}/exercise_{exercise_id}/video.mp4', 'data/trace/user_{user_id}/exercise_{exercise_id}/output.csv')")
+    output_csv_path = get_next_sequence_path(output_folder)
+    process_video_to_csv(file_path, output_csv_path)
     
     
     return {
