@@ -13,6 +13,10 @@ interface CameraRecorderProps {
 }
 
 const MAX_RECORDING_SECONDS = 20;
+const GUIDANCE_MESSAGES_TO_SKIP = new Set([
+    "Preparing live guidance...",
+    "Preparing live guidance…",
+]);
 
 export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignmentId, onSave}: CameraRecorderProps) {
     const [isOpen, setIsOpen] = useState(false);
@@ -41,6 +45,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const blobRef = useRef<Blob | null>(null);
+    const liveGuidanceFeedbackRef = useRef<string[]>([]);
     const liveGuidanceEnabled =
         isOpen &&
         Boolean(stream) &&
@@ -51,6 +56,24 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         videoRef,
         poseCanvasRef,
     );
+
+    useEffect(() => {
+        if (
+            !isRecording ||
+            liveGuidance.status !== "ready" ||
+            !liveGuidance.message ||
+            GUIDANCE_MESSAGES_TO_SKIP.has(liveGuidance.message)
+        ) {
+            return;
+        }
+
+        if (!liveGuidanceFeedbackRef.current.includes(liveGuidance.message)) {
+            liveGuidanceFeedbackRef.current = [
+                ...liveGuidanceFeedbackRef.current,
+                liveGuidance.message,
+            ];
+        }
+    }, [isRecording, liveGuidance.message, liveGuidance.status]);
 
     // Clean up streams on unmount or close
     useEffect(() => {
@@ -133,6 +156,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         });
         setIsSubmittingCheckIn(false);
         setCheckInMessage(null);
+        liveGuidanceFeedbackRef.current = [];
         blobRef.current = null;
     };
 
@@ -156,6 +180,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const startRecording = () => {
         if (!stream) return;
         chunksRef.current = [];
+        liveGuidanceFeedbackRef.current = [];
 
         try {
             const options = { mimeType: "video/webm;codecs=vp9" };
@@ -228,6 +253,24 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             if (res.success) {
                 setEvaluationScore(res.score);
                 setSessionId(res.sessionId);
+                const sessionFeedback = [
+                    ...(res.feedback ?? []),
+                    ...liveGuidanceFeedbackRef.current,
+                ].filter((message, index, messages) => messages.indexOf(message) === index);
+
+                if (sessionFeedback.length > 0) {
+                    try {
+                        await api.updateSessionFeedback(
+                            res.sessionId,
+                            sessionFeedback,
+                        );
+                    } catch (feedbackError: unknown) {
+                        console.warn(
+                            "Failed to save live guidance feedback:",
+                            getErrorMessage(feedbackError, "Unknown error"),
+                        );
+                    }
+                }
                 setIsOpen(false);
                 setIsCheckInOpen(true);
             } else {
@@ -274,6 +317,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             confidenceLevel: 10,
             note: "",
         });
+        liveGuidanceFeedbackRef.current = [];
     };
 
     const updateCheckInField = (

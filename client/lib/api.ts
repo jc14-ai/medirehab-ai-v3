@@ -390,7 +390,7 @@ export const api = {
   },
 
   evaluateExercise(exerciseId: string, assignmentId: string, videoBlob: Blob) {
-    return request<{ success: boolean; score: number; sessionId: string; message?: string }>(`/exercises/patients/exercises/${exerciseId}/assignments/${assignmentId}/evaluate`, {
+    return request<{ success: boolean; score: number; feedback?: string[]; sessionId: string; message?: string }>(`/exercises/patients/exercises/${exerciseId}/assignments/${assignmentId}/evaluate`, {
       method: "POST",
       headers: {
         "Content-Type": videoBlob.type || "video/webm",
