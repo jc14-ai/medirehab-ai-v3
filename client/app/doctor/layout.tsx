@@ -37,6 +37,15 @@ function SettingsIcon() {
   );
 }
 
+function BellIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 17h5l-1.4-1.4a2 2 0 0 1-.6-1.4V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5" />
+      <path d="M10 17a2 2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
 function LogOutIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,6 +78,7 @@ const NAV_ITEMS = [
   { name: "Dashboard", href: "/doctor/dashboard", icon: <LayoutDashboardIcon /> },
   { name: "Patients", href: "/doctor/patients", icon: <UsersIcon /> },
   { name: "Exercise Assignments", href: "/doctor/exercise-assignments", icon: <ActivityIcon /> },
+  { name: "Notifications", href: "/doctor/notifications", icon: <BellIcon /> },
   { name: "Profile", href: "/doctor/profile", icon: <SettingsIcon /> },
 ];
 

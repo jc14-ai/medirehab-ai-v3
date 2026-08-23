@@ -11,6 +11,7 @@ import {
     updateExercise,
     evaluateExercise
 } from "../services/exercise.service";
+import { recordExerciseSession } from "../services/care.service";
 import { HttpError } from "../utils/httpError";
 import {
     validateAssignExerciseInput,
@@ -272,11 +273,19 @@ export const evaluateExerciseAssignment = async (
             videoBuffer,
             contentType
         );
+        const session = await recordExerciseSession(
+            authenticatedUserId,
+            assignmentId,
+            exerciseId,
+            result.score,
+            result.feedback
+        );
 
         res.status(200).json({
             success: true,
             message: "Exercise evaluated successfully.",
-            ...result
+            ...result,
+            sessionId: session.id
         });
     } catch (error) {
         handleExerciseError(error, res, "Unable to process exercise evaluation.");

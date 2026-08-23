@@ -23,6 +23,16 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const [error, setError] = useState<string | null>(null);
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [evaluationScore, setEvaluationScore] = useState<number | null>(null);
+    const [sessionId, setSessionId] = useState<string | null>(null);
+    const [isCheckInOpen, setIsCheckInOpen] = useState(false);
+    const [checkIn, setCheckIn] = useState({
+        painLevel: 0,
+        difficultyLevel: 0,
+        confidenceLevel: 10,
+        note: "",
+    });
+    const [isSubmittingCheckIn, setIsSubmittingCheckIn] = useState(false);
+    const [checkInMessage, setCheckInMessage] = useState<string | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const poseCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -113,6 +123,16 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         setRecordedUrl(null);
         setIsEvaluating(false);
         setEvaluationScore(null);
+        setSessionId(null);
+        setIsCheckInOpen(false);
+        setCheckIn({
+            painLevel: 0,
+            difficultyLevel: 0,
+            confidenceLevel: 10,
+            note: "",
+        });
+        setIsSubmittingCheckIn(false);
+        setCheckInMessage(null);
         blobRef.current = null;
     };
 
@@ -207,6 +227,9 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             const res = await api.evaluateExercise(exerciseId, assignmentId, blobRef.current);
             if (res.success) {
                 setEvaluationScore(res.score);
+                setSessionId(res.sessionId);
+                setIsOpen(false);
+                setIsCheckInOpen(true);
             } else {
                 setError(res.message || "Failed to evaluate exercise.");
             }
@@ -217,6 +240,50 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         } finally {
             setIsEvaluating(false);
         }
+    };
+
+    const handleSubmitCheckIn = async () => {
+        if (!sessionId) {
+            setError("No session was created for this exercise.");
+            return;
+        }
+
+        setIsSubmittingCheckIn(true);
+        setError(null);
+
+        try {
+            await api.submitCheckIn(sessionId, checkIn);
+            setCheckInMessage("Check-in saved for your doctor.");
+        } catch (err: unknown) {
+            const message = getErrorMessage(err, "Unable to submit your check-in.");
+            console.warn("Check-in request failed:", message);
+            setError(message);
+        } finally {
+            setIsSubmittingCheckIn(false);
+        }
+    };
+
+    const handleCloseCheckIn = () => {
+        setIsCheckInOpen(false);
+        setEvaluationScore(null);
+        setSessionId(null);
+        setCheckInMessage(null);
+        setCheckIn({
+            painLevel: 0,
+            difficultyLevel: 0,
+            confidenceLevel: 10,
+            note: "",
+        });
+    };
+
+    const updateCheckInField = (
+        field: "painLevel" | "difficultyLevel" | "confidenceLevel",
+        value: number
+    ) => {
+        setCheckIn((current) => ({
+            ...current,
+            [field]: value,
+        }));
     };
 
     return (
@@ -639,6 +706,144 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                     Start Recording
                                 </button>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {isCheckInOpen && (
+                <div
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        backgroundColor: "rgba(15, 23, 42, 0.45)",
+                        backdropFilter: "blur(3px)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 10000,
+                        padding: "20px",
+                    }}
+                    onClick={handleCloseCheckIn}
+                >
+                    <div
+                        className="card animate-slide-up"
+                        style={{
+                            width: "100%",
+                            maxWidth: "640px",
+                            backgroundColor: "#FFFFFF",
+                            borderRadius: "20px",
+                            boxShadow: "0 20px 60px rgba(15, 23, 42, 0.16)",
+                            border: "1px solid rgba(226, 232, 240, 0.9)",
+                            overflow: "hidden",
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div style={{ padding: "22px 22px 18px 22px", borderBottom: "1px solid var(--color-border)" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", gap: "16px", alignItems: "flex-start" }}>
+                                <div>
+                                    <div style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: "6px" }}>
+                                        Post Exercise Check-in
+                                    </div>
+                                    <h3 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "var(--color-text-primary)" }}>
+                                        How did that session feel?
+                                    </h3>
+                                    <p style={{ margin: "8px 0 0 0", color: "var(--color-text-secondary)", fontSize: "14px" }}>
+                                        Share a quick self-report for your doctor after scoring {evaluationScore ?? 0}/100.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleCloseCheckIn}
+                                    className="btn btn-secondary"
+                                    style={{ height: "36px", width: "36px", padding: 0, minWidth: 0 }}
+                                    aria-label="Close check-in"
+                                >
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ padding: "20px 22px 22px 22px", display: "flex", flexDirection: "column", gap: "16px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px" }}>
+                                {[
+                                    {
+                                        key: "painLevel",
+                                        label: "Pain",
+                                        value: checkIn.painLevel,
+                                        helper: "0 = none, 10 = severe",
+                                    },
+                                    {
+                                        key: "difficultyLevel",
+                                        label: "Difficulty",
+                                        value: checkIn.difficultyLevel,
+                                        helper: "How hard the movement felt",
+                                    },
+                                    {
+                                        key: "confidenceLevel",
+                                        label: "Confidence",
+                                        value: checkIn.confidenceLevel,
+                                        helper: "How ready you feel to repeat it",
+                                    },
+                                ].map((item) => (
+                                    <label key={item.key} style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px", minWidth: 0 }}>
+                                        <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center" }}>
+                                            <span style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>{item.label}</span>
+                                            <span className="badge badge-blue">{item.value}/10</span>
+                                        </div>
+                                        <input
+                                            className="input"
+                                            type="range"
+                                            min={0}
+                                            max={10}
+                                            value={item.value}
+                                            onChange={(event) => updateCheckInField(item.key as "painLevel" | "difficultyLevel" | "confidenceLevel", Number(event.target.value))}
+                                            style={{ height: "28px", padding: 0, background: "transparent" }}
+                                        />
+                                        <div style={{ fontSize: "12px", color: "var(--color-text-muted)", lineHeight: 1.3 }}>
+                                            {item.helper}
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+
+                            <label style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px", minWidth: 0 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: "10px", alignItems: "center" }}>
+                                    <span style={{ fontWeight: 600, color: "var(--color-text-primary)" }}>Notes for your doctor</span>
+                                    <span style={{ fontSize: "12px", color: "var(--color-text-muted)" }}>Optional</span>
+                                </div>
+                                <textarea
+                                    className="input"
+                                    value={checkIn.note}
+                                    onChange={(event) => setCheckIn((current) => ({ ...current, note: event.target.value }))}
+                                    placeholder="Any pain, stiffness, or issues you want your doctor to know?"
+                                    style={{ minHeight: "86px", resize: "vertical", paddingTop: "10px", width: "100%", minWidth: 0 }}
+                                />
+                            </label>
+
+                            {error && (
+                                <div style={{ padding: "10px 12px", borderRadius: "12px", backgroundColor: "#FEE2E2", color: "#991B1B", fontSize: "13px" }}>
+                                    {error}
+                                </div>
+                            )}
+
+                            {checkInMessage && (
+                                <div style={{ padding: "10px 12px", borderRadius: "12px", backgroundColor: "#DCFCE7", color: "#166534", fontSize: "13px" }}>
+                                    {checkInMessage}
+                                </div>
+                            )}
+
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", flexWrap: "wrap" }}>
+                                <button className="btn btn-secondary" type="button" onClick={handleCloseCheckIn}>
+                                    Close
+                                </button>
+                                <button className="btn btn-primary" onClick={handleSubmitCheckIn} disabled={isSubmittingCheckIn} style={{ minWidth: "150px", height: "40px" }}>
+                                    {isSubmittingCheckIn ? "Saving..." : "Submit Check-in"}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

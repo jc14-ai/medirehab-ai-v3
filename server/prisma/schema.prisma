@@ -19,6 +19,9 @@ model User {
 
   patientProfile PatientProfile?
   doctorProfile  DoctorProfile?
+  notifications  Notification[]
+  exerciseSessions ExerciseSession[]
+  authoredExerciseSessionComments ExerciseSessionComment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -123,6 +126,7 @@ model ExerciseAssignment {
   patientProfile   PatientProfile @relation(fields: [patientProfileId], references: [id], onDelete: Cascade)
   assignedByDoctor DoctorProfile  @relation(fields: [assignedByDoctorId], references: [id], onDelete: Restrict)
   result           ExerciseResult?
+  sessions         ExerciseSession[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -144,4 +148,73 @@ model ExerciseResult {
   updatedAt DateTime @updatedAt
 
   @@map("exercise_results")
+}
+
+model ExerciseSession {
+  id               String   @id @default(cuid())
+  assignmentId     String
+  patientUserId    String
+  score            Float?
+  aiFeedback       Json?
+  painLevel        Int?
+  difficultyLevel  Int?
+  confidenceLevel  Int?
+  patientNote      String?
+  performedAt      DateTime @default(now())
+
+  assignment ExerciseAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  patient    User               @relation(fields: [patientUserId], references: [id], onDelete: Cascade)
+  comments   ExerciseSessionComment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("exercise_sessions")
+  @@index([assignmentId, performedAt])
+  @@index([patientUserId, performedAt])
+}
+
+model ExerciseSessionComment {
+  id             String   @id @default(cuid())
+  sessionId      String
+  authorUserId   String
+  body           String
+  isVisibleToPatient Boolean @default(true)
+
+  session ExerciseSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  author  User            @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("exercise_session_comments")
+  @@index([sessionId, createdAt])
+  @@index([authorUserId, createdAt])
+}
+
+model Notification {
+  id            String           @id @default(cuid())
+  userId        String
+  type          NotificationType
+  title         String
+  body          String
+  link          String?
+  isRead        Boolean          @default(false)
+  readAt        DateTime?
+  meta          Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("notifications")
+  @@index([userId, isRead, createdAt])
+}
+
+enum NotificationType {
+  SESSION_RESULT
+  SESSION_CHECKIN
+  DOCTOR_COMMENT
+  REMINDER
 }

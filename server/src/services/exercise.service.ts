@@ -330,6 +330,7 @@ type AiServiceResponse = {
     detail?: string;
     evaluationId?: string;
     score?: unknown;
+    feedback?: unknown;
 };
 
 const DEFAULT_AI_SERVICE_TIMEOUT_MS = 120_000;
@@ -502,6 +503,10 @@ export const evaluateExercise = async (
         select: { score: true }
     });
 
-    return { score: result.score };
+    const feedback = Array.isArray(evaluationResult.feedback)
+        ? evaluationResult.feedback.filter((item): item is string => typeof item === "string")
+        : [];
+
+    return { score: result.score, feedback };
 };
 
