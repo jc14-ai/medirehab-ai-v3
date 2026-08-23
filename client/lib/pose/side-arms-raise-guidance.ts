@@ -23,6 +23,10 @@ export interface SideArmsRaiseGuidanceSnapshot {
 
 const REQUIRED_VISIBILITY = 0.6;
 const REQUIRED_CONSECUTIVE_FRAMES = 2;
+const SIDE_HEIGHT_DIFF_THRESHOLD = 0.25;
+const SHOULDER_HEIGHT_LOW_THRESHOLD = 0.35;
+const SHOULDER_HEIGHT_HIGH_THRESHOLD = -0.35;
+const MIN_SIDE_REACH = 0.3;
 
 export const INITIAL_SIDE_ARMS_RAISE_STATE: SideArmsRaiseGuidanceState = {
     phase: "positioning",
@@ -129,10 +133,19 @@ export function updateSideArmsRaiseGuidance(
         consecutiveDownFrames,
         consecutiveTopFrames,
     };
+    const correctionMessage = correctiveGuidanceMessage(
+        state,
+        leftDrop,
+        rightDrop,
+        leftReach,
+        rightReach,
+    );
 
     return {
         state,
-        message: guidanceMessage(state, justCompletedRepetition),
+        message: justCompletedRepetition
+            ? guidanceMessage(state, justCompletedRepetition)
+            : correctionMessage ?? guidanceMessage(state, justCompletedRepetition),
         hasReliablePose: true,
         justCompletedRepetition,
     };
@@ -166,4 +179,64 @@ function guidanceMessage(
         case "lowering":
             return "Continue lowering both arms in a controlled motion.";
     }
+}
+
+function correctiveGuidanceMessage(
+    state: SideArmsRaiseGuidanceState,
+    leftDrop: number,
+    rightDrop: number,
+    leftReach: number,
+    rightReach: number,
+): string | null {
+    if (state.phase !== "raising" && state.phase !== "top") {
+        return null;
+    }
+
+    if (leftReach < MIN_SIDE_REACH && rightReach < MIN_SIDE_REACH) {
+        return "Reach both arms farther out to your sides.";
+    }
+
+    if (leftReach < MIN_SIDE_REACH) {
+        return "Reach your left arm farther out to the side.";
+    }
+
+    if (rightReach < MIN_SIDE_REACH) {
+        return "Reach your right arm farther out to the side.";
+    }
+
+    if (leftDrop - rightDrop > SIDE_HEIGHT_DIFF_THRESHOLD) {
+        return "Raise your left arm higher to match your right arm.";
+    }
+
+    if (rightDrop - leftDrop > SIDE_HEIGHT_DIFF_THRESHOLD) {
+        return "Raise your right arm higher to match your left arm.";
+    }
+
+    if (state.phase === "top") {
+        if (leftDrop > SHOULDER_HEIGHT_LOW_THRESHOLD && rightDrop > SHOULDER_HEIGHT_LOW_THRESHOLD) {
+            return "Raise both arms a little higher to shoulder height.";
+        }
+
+        if (leftDrop > SHOULDER_HEIGHT_LOW_THRESHOLD) {
+            return "Raise your left arm a little higher to shoulder height.";
+        }
+
+        if (rightDrop > SHOULDER_HEIGHT_LOW_THRESHOLD) {
+            return "Raise your right arm a little higher to shoulder height.";
+        }
+
+        if (leftDrop < SHOULDER_HEIGHT_HIGH_THRESHOLD && rightDrop < SHOULDER_HEIGHT_HIGH_THRESHOLD) {
+            return "Lower both arms slightly back to shoulder height.";
+        }
+
+        if (leftDrop < SHOULDER_HEIGHT_HIGH_THRESHOLD) {
+            return "Lower your left arm slightly back to shoulder height.";
+        }
+
+        if (rightDrop < SHOULDER_HEIGHT_HIGH_THRESHOLD) {
+            return "Lower your right arm slightly back to shoulder height.";
+        }
+    }
+
+    return null;
 }
