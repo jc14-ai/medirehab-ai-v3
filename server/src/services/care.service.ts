@@ -3,8 +3,7 @@ import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/httpError";
 import {
     ValidatedCheckInInput,
-    ValidatedCommentInput,
-    ValidatedSessionUpdateInput
+    ValidatedCommentInput
 } from "../utils/careValidation";
 
 const exerciseSelect = {
@@ -373,35 +372,7 @@ export const recordExerciseSession = async (
     return mapSession(session);
 };
 
-export const updateSessionAiFeedback = async (
-    patientUserId: string,
-    sessionId: string,
-    input: ValidatedSessionUpdateInput
-) => {
-    const existingSession = await prisma.exerciseSession.findFirst({
-        where: {
-            id: sessionId,
-            patientUserId
-        },
-        select: {
-            id: true
-        }
-    });
 
-    if (!existingSession) {
-        throw new HttpError(404, "Session not found.");
-    }
-
-    const session = await prisma.exerciseSession.update({
-        where: { id: existingSession.id },
-        data: {
-            ...(input.aiFeedback !== undefined ? { aiFeedback: input.aiFeedback } : {})
-        },
-        select: sessionSelect
-    });
-
-    return mapSession(session);
-};
 
 export const submitCheckInForSession = async (
     patientUserId: string,

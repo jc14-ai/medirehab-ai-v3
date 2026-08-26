@@ -5,16 +5,14 @@ import {
     listSessionsForDoctorPatient,
     listSessionsForPatient,
     markNotificationRead,
-    submitCheckInForSession,
-    updateSessionAiFeedback
+    submitCheckInForSession
 } from "../services/care.service";
 import { HttpError } from "../utils/httpError";
 import {
     validateCheckInInput,
     validateCommentInput,
     validateNotificationIdParam,
-    validateSessionIdParam,
-    validateSessionUpdateInput
+    validateSessionIdParam
 } from "../utils/careValidation";
 import { validateUserIdParam } from "../utils/userValidation";
 
@@ -80,29 +78,7 @@ export const getDoctorPatientSessions = async (
     }
 };
 
-export const updateSessionFeedback = async (
-    req: Request,
-    res: Response
-): Promise<void> => {
-    try {
-        const user = getAuthenticatedUser(req);
-        const sessionId = validateSessionIdParam(req.params.sessionId);
-        const input = validateSessionUpdateInput(req.body);
-        const session = await updateSessionAiFeedback(
-            user.userId,
-            sessionId,
-            input
-        );
 
-        res.status(200).json({
-            success: true,
-            message: "Session updated successfully.",
-            session
-        });
-    } catch (error) {
-        handleCareError(error, res, "Unable to update session.");
-    }
-};
 
 export const submitCheckIn = async (
     req: Request,
