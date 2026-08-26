@@ -408,12 +408,6 @@ export const api = {
     return request<{ success: boolean; sessions: CareSession[] }>(`/care/patients/${patientUserId}/sessions`);
   },
 
-  updateSessionFeedback(sessionId: string, aiFeedback: string[]) {
-    return request<{ success: boolean; session: CareSession }>(`/care/sessions/${sessionId}/feedback`, {
-      method: "PATCH",
-      body: JSON.stringify({ aiFeedback }),
-    });
-  },
 
   submitCheckIn(sessionId: string, data: { painLevel: number; difficultyLevel: number; confidenceLevel: number; note?: string }) {
     return request<{ success: boolean; session: CareSession }>(`/care/sessions/${sessionId}/check-in`, {
