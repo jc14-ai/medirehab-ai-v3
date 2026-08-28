@@ -19,14 +19,27 @@ export interface SideArmsRaiseGuidanceSnapshot {
     message: string;
     hasReliablePose: boolean;
     justCompletedRepetition: boolean;
+    keyPoints: RequiredKeyPointStatus[];
 }
 
-const REQUIRED_VISIBILITY = 0.6;
+export interface RequiredKeyPointStatus {
+    id: keyof UpperBodyLandmarks;
+    label: string;
+    isVisible: boolean;
+}
+
+export const REQUIRED_VISIBILITY = 0.6;
 const REQUIRED_CONSECUTIVE_FRAMES = 2;
 const SIDE_HEIGHT_DIFF_THRESHOLD = 0.25;
 const SHOULDER_HEIGHT_LOW_THRESHOLD = 0.35;
 const SHOULDER_HEIGHT_HIGH_THRESHOLD = -0.35;
 const MIN_SIDE_REACH = 0.3;
+const REQUIRED_KEY_POINTS: Array<Pick<RequiredKeyPointStatus, "id" | "label">> = [
+    { id: "leftShoulder", label: "Left shoulder" },
+    { id: "rightShoulder", label: "Right shoulder" },
+    { id: "leftElbow", label: "Left elbow" },
+    { id: "rightElbow", label: "Right elbow" },
+];
 
 export const INITIAL_SIDE_ARMS_RAISE_STATE: SideArmsRaiseGuidanceState = {
     phase: "positioning",
@@ -53,6 +66,7 @@ export function updateSideArmsRaiseGuidance(
             message: "Move fully into the frame so both shoulders and elbows are visible.",
             hasReliablePose: false,
             justCompletedRepetition: false,
+            keyPoints: getRequiredKeyPointStatuses(landmarks),
         };
     }
 
@@ -67,6 +81,7 @@ export function updateSideArmsRaiseGuidance(
             message: "Face the camera and keep both shoulders visible.",
             hasReliablePose: false,
             justCompletedRepetition: false,
+            keyPoints: getRequiredKeyPointStatuses(landmarks),
         };
     }
 
@@ -148,7 +163,17 @@ export function updateSideArmsRaiseGuidance(
             : correctionMessage ?? guidanceMessage(state, justCompletedRepetition),
         hasReliablePose: true,
         justCompletedRepetition,
+        keyPoints: getRequiredKeyPointStatuses(landmarks),
     };
+}
+
+export function getRequiredKeyPointStatuses(
+    landmarks: UpperBodyLandmarks | null,
+): RequiredKeyPointStatus[] {
+    return REQUIRED_KEY_POINTS.map((point) => ({
+        ...point,
+        isVisible: (landmarks?.[point.id]?.visibility ?? 0) >= REQUIRED_VISIBILITY,
+    }));
 }
 
 function hasReliableUpperBodyLandmarks(landmarks: UpperBodyLandmarks): boolean {

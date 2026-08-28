@@ -39,7 +39,6 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const [checkInMessage, setCheckInMessage] = useState<string | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
-    const poseCanvasRef = useRef<HTMLCanvasElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -54,7 +53,6 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const liveGuidance = useSideArmsRaiseGuidance(
         liveGuidanceEnabled,
         videoRef,
-        poseCanvasRef,
     );
 
     useEffect(() => {
@@ -503,19 +501,6 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
 
                                     {liveGuidanceEnabled && (
                                         <>
-                                            <canvas
-                                                ref={poseCanvasRef}
-                                                aria-hidden="true"
-                                                style={{
-                                                    position: "absolute",
-                                                    inset: 0,
-                                                    width: "100%",
-                                                    height: "100%",
-                                                    pointerEvents: "none",
-                                                    transform: "scaleX(-1)",
-                                                    zIndex: 4,
-                                                }}
-                                            />
                                             <div
                                                 style={{
                                                     position: "absolute",
@@ -547,6 +532,64 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                                     }}
                                                 />
                                                 Live guidance
+                                            </div>
+                                            <div
+                                                aria-label="Required key point visibility"
+                                                style={{
+                                                    position: "absolute",
+                                                    top: "52px",
+                                                    right: "16px",
+                                                    width: "min(220px, calc(100% - 32px))",
+                                                    padding: "10px",
+                                                    borderRadius: "12px",
+                                                    backgroundColor: "rgba(15, 23, 42, 0.78)",
+                                                    color: "#FFF",
+                                                    zIndex: 10,
+                                                    boxShadow: "0 8px 24px rgba(0, 0, 0, 0.22)",
+                                                }}
+                                            >
+                                                <div
+                                                    style={{
+                                                        fontSize: "11px",
+                                                        fontWeight: 700,
+                                                        textTransform: "uppercase",
+                                                        color: "rgba(255, 255, 255, 0.72)",
+                                                        marginBottom: "8px",
+                                                    }}
+                                                >
+                                                    Key points needed
+                                                </div>
+                                                <div style={{ display: "grid", gap: "6px" }}>
+                                                    {liveGuidance.keyPoints.map((point) => (
+                                                        <div
+                                                            key={point.id}
+                                                            style={{
+                                                                display: "flex",
+                                                                alignItems: "center",
+                                                                justifyContent: "space-between",
+                                                                gap: "10px",
+                                                                fontSize: "12px",
+                                                                fontWeight: 600,
+                                                            }}
+                                                        >
+                                                            <span>{point.label}</span>
+                                                            <span
+                                                                aria-label={point.isVisible ? "Visible" : "Not visible"}
+                                                                title={point.isVisible ? "Visible" : "Not visible"}
+                                                                style={{
+                                                                    width: "12px",
+                                                                    height: "12px",
+                                                                    borderRadius: "9999px",
+                                                                    backgroundColor: point.isVisible ? "#22C55E" : "#EF4444",
+                                                                    boxShadow: point.isVisible
+                                                                        ? "0 0 0 3px rgba(34, 197, 94, 0.18)"
+                                                                        : "0 0 0 3px rgba(239, 68, 68, 0.18)",
+                                                                    flex: "0 0 auto",
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                             <div
                                                 aria-live="polite"

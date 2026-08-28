@@ -2,14 +2,15 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
+    getRequiredKeyPointStatuses,
     INITIAL_SIDE_ARMS_RAISE_STATE,
     updateSideArmsRaiseGuidance,
+    type RequiredKeyPointStatus,
     type SideArmsRaiseGuidanceState,
 } from "@/lib/pose/side-arms-raise-guidance";
 import type {
     PoseWorkerRequest,
     PoseWorkerResponse,
-    UpperBodyLandmarks,
 } from "@/lib/pose/pose-landmarker.types";
 
 const TARGET_FRAME_INTERVAL_MS = 100;
@@ -24,6 +25,7 @@ interface LiveGuidanceView {
     repetitions: number;
     hasReliablePose: boolean;
     justCompletedRepetition: boolean;
+    keyPoints: RequiredKeyPointStatus[];
 }
 
 const DISABLED_VIEW: LiveGuidanceView = {
@@ -32,6 +34,7 @@ const DISABLED_VIEW: LiveGuidanceView = {
     repetitions: 0,
     hasReliablePose: false,
     justCompletedRepetition: false,
+    keyPoints: [],
 };
 
 const LOADING_VIEW: LiveGuidanceView = {
@@ -40,19 +43,18 @@ const LOADING_VIEW: LiveGuidanceView = {
     repetitions: 0,
     hasReliablePose: false,
     justCompletedRepetition: false,
+    keyPoints: getRequiredKeyPointStatuses(null),
 };
 
 export function useSideArmsRaiseGuidance(
     enabled: boolean,
     videoRef: RefObject<HTMLVideoElement | null>,
-    canvasRef: RefObject<HTMLCanvasElement | null>,
 ): LiveGuidanceView {
     const [view, setView] = useState<LiveGuidanceView>(DISABLED_VIEW);
     const guidanceStateRef = useRef<SideArmsRaiseGuidanceState>(INITIAL_SIDE_ARMS_RAISE_STATE);
 
     useEffect(() => {
         if (!enabled) {
-            clearCanvas(canvasRef.current);
             return;
         }
 
@@ -61,7 +63,6 @@ export function useSideArmsRaiseGuidance(
         let workerReady = false;
         let lastFrameTime = 0;
         let animationFrameId = 0;
-        const canvas = canvasRef.current;
 
         guidanceStateRef.current = INITIAL_SIDE_ARMS_RAISE_STATE;
         const resetViewFrameId = window.requestAnimationFrame(() => setView(LOADING_VIEW));
@@ -75,13 +76,13 @@ export function useSideArmsRaiseGuidance(
             if (disposed) return;
             workerReady = false;
             framePending = false;
-            clearCanvas(canvas);
             setView({
                 status: "error",
                 message: "Live guidance is unavailable. Recording still works.",
                 repetitions: guidanceStateRef.current.repetitions,
                 hasReliablePose: false,
                 justCompletedRepetition: false,
+                keyPoints: getRequiredKeyPointStatuses(null),
             });
         };
 
@@ -96,6 +97,7 @@ export function useSideArmsRaiseGuidance(
                     repetitions: 0,
                     hasReliablePose: false,
                     justCompletedRepetition: false,
+                    keyPoints: getRequiredKeyPointStatuses(null),
                 });
                 return;
             }
@@ -106,7 +108,6 @@ export function useSideArmsRaiseGuidance(
             }
 
             framePending = false;
-            drawUpperBodyPose(canvas, videoRef.current, event.data.landmarks);
             const snapshot = updateSideArmsRaiseGuidance(
                 guidanceStateRef.current,
                 event.data.landmarks,
@@ -118,6 +119,7 @@ export function useSideArmsRaiseGuidance(
                 repetitions: snapshot.state.repetitions,
                 hasReliablePose: snapshot.hasReliablePose,
                 justCompletedRepetition: snapshot.justCompletedRepetition,
+                keyPoints: snapshot.keyPoints,
             });
         };
 
@@ -174,89 +176,9 @@ export function useSideArmsRaiseGuidance(
             const closeMessage: PoseWorkerRequest = { type: "close" };
             worker.postMessage(closeMessage);
             worker.terminate();
-            clearCanvas(canvas);
         };
-    }, [canvasRef, enabled, videoRef]);
+    }, [enabled, videoRef]);
 
     if (!enabled) return DISABLED_VIEW;
     return view.status === "disabled" ? LOADING_VIEW : view;
-}
-
-function drawUpperBodyPose(
-    canvas: HTMLCanvasElement | null,
-    video: HTMLVideoElement | null,
-    landmarks: UpperBodyLandmarks | null,
-): void {
-    if (!canvas || !video) return;
-
-    const context = canvas.getContext("2d");
-    if (!context) return;
-
-    const displayWidth = canvas.clientWidth;
-    const displayHeight = canvas.clientHeight;
-    const pixelRatio = window.devicePixelRatio || 1;
-    const requiredWidth = Math.round(displayWidth * pixelRatio);
-    const requiredHeight = Math.round(displayHeight * pixelRatio);
-
-    if (canvas.width !== requiredWidth || canvas.height !== requiredHeight) {
-        canvas.width = requiredWidth;
-        canvas.height = requiredHeight;
-    }
-
-    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    context.clearRect(0, 0, displayWidth, displayHeight);
-    if (!landmarks || !video.videoWidth || !video.videoHeight) return;
-
-    const coverScale = Math.max(
-        displayWidth / video.videoWidth,
-        displayHeight / video.videoHeight,
-    );
-    const renderedWidth = video.videoWidth * coverScale;
-    const renderedHeight = video.videoHeight * coverScale;
-    const offsetX = (displayWidth - renderedWidth) / 2;
-    const offsetY = (displayHeight - renderedHeight) / 2;
-    const toCanvasPoint = (point: { x: number; y: number }) => ({
-        x: point.x * renderedWidth + offsetX,
-        y: point.y * renderedHeight + offsetY,
-    });
-
-    const leftShoulder = toCanvasPoint(landmarks.leftShoulder);
-    const rightShoulder = toCanvasPoint(landmarks.rightShoulder);
-    const leftElbow = toCanvasPoint(landmarks.leftElbow);
-    const rightElbow = toCanvasPoint(landmarks.rightElbow);
-
-    context.lineCap = "round";
-    context.lineJoin = "round";
-    context.lineWidth = 5;
-    context.strokeStyle = "rgba(45, 212, 191, 0.95)";
-    drawLine(context, leftElbow, leftShoulder);
-    drawLine(context, leftShoulder, rightShoulder);
-    drawLine(context, rightShoulder, rightElbow);
-
-    for (const point of [leftElbow, leftShoulder, rightShoulder, rightElbow]) {
-        context.beginPath();
-        context.arc(point.x, point.y, 7, 0, Math.PI * 2);
-        context.fillStyle = "#F8FAFC";
-        context.fill();
-        context.lineWidth = 4;
-        context.strokeStyle = "#0F766E";
-        context.stroke();
-    }
-}
-
-function drawLine(
-    context: CanvasRenderingContext2D,
-    from: { x: number; y: number },
-    to: { x: number; y: number },
-): void {
-    context.beginPath();
-    context.moveTo(from.x, from.y);
-    context.lineTo(to.x, to.y);
-    context.stroke();
-}
-
-function clearCanvas(canvas: HTMLCanvasElement | null): void {
-    if (!canvas) return;
-    const context = canvas.getContext("2d");
-    context?.clearRect(0, 0, canvas.width, canvas.height);
 }
