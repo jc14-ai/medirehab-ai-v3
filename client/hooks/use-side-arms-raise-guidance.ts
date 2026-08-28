@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState, type RefObject } from "react";
 import {
-    getRequiredKeyPointStatuses,
     INITIAL_SIDE_ARMS_RAISE_STATE,
     updateSideArmsRaiseGuidance,
-    type RequiredKeyPointStatus,
     type SideArmsRaiseGuidanceState,
 } from "@/lib/pose/side-arms-raise-guidance";
+import {
+    getRequiredExerciseKeyPointVisibility,
+    type ExerciseKeyPointVisibility,
+} from "@/lib/pose/exercise-key-points";
 import type {
     PoseWorkerRequest,
     PoseWorkerResponse,
@@ -25,7 +27,7 @@ interface LiveGuidanceView {
     repetitions: number;
     hasReliablePose: boolean;
     justCompletedRepetition: boolean;
-    keyPoints: RequiredKeyPointStatus[];
+    keyPoints: ExerciseKeyPointVisibility[];
 }
 
 const DISABLED_VIEW: LiveGuidanceView = {
@@ -43,7 +45,7 @@ const LOADING_VIEW: LiveGuidanceView = {
     repetitions: 0,
     hasReliablePose: false,
     justCompletedRepetition: false,
-    keyPoints: getRequiredKeyPointStatuses(null),
+    keyPoints: getRequiredExerciseKeyPointVisibility("Side Arms Raise", null),
 };
 
 export function useSideArmsRaiseGuidance(
@@ -82,7 +84,7 @@ export function useSideArmsRaiseGuidance(
                 repetitions: guidanceStateRef.current.repetitions,
                 hasReliablePose: false,
                 justCompletedRepetition: false,
-                keyPoints: getRequiredKeyPointStatuses(null),
+                keyPoints: getRequiredExerciseKeyPointVisibility("Side Arms Raise", null),
             });
         };
 
@@ -97,7 +99,7 @@ export function useSideArmsRaiseGuidance(
                     repetitions: 0,
                     hasReliablePose: false,
                     justCompletedRepetition: false,
-                    keyPoints: getRequiredKeyPointStatuses(null),
+                    keyPoints: getRequiredExerciseKeyPointVisibility("Side Arms Raise", null),
                 });
                 return;
             }

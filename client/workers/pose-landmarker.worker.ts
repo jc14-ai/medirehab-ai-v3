@@ -1,15 +1,27 @@
 import { FilesetResolver, PoseLandmarker } from "@mediapipe/tasks-vision";
 import type {
+    PoseLandmarkKey,
+    PoseLandmarkMap,
     PosePoint,
     PoseWorkerRequest,
     PoseWorkerResponse,
-    UpperBodyLandmarks,
 } from "@/lib/pose/pose-landmarker.types";
 
-const LEFT_SHOULDER = 11;
-const RIGHT_SHOULDER = 12;
-const LEFT_ELBOW = 13;
-const RIGHT_ELBOW = 14;
+const LANDMARK_INDEXES: Record<PoseLandmarkKey, number> = {
+    nose: 0,
+    leftShoulder: 11,
+    rightShoulder: 12,
+    leftElbow: 13,
+    rightElbow: 14,
+    leftWrist: 15,
+    rightWrist: 16,
+    leftHip: 23,
+    rightHip: 24,
+    leftKnee: 25,
+    rightKnee: 26,
+    leftAnkle: 27,
+    rightAnkle: 28,
+};
 
 const workerScope = self as unknown as {
     onmessage: ((event: MessageEvent<PoseWorkerRequest>) => void) | null;
@@ -65,7 +77,7 @@ workerScope.onmessage = async (event) => {
         const pose = result.landmarks[0];
         workerScope.postMessage({
             type: "result",
-            landmarks: pose ? selectUpperBodyLandmarks(pose) : null,
+            landmarks: pose ? selectBodyLandmarks(pose) : null,
         });
     } catch (error) {
         workerScope.postMessage({
@@ -77,21 +89,21 @@ workerScope.onmessage = async (event) => {
     }
 };
 
-function selectUpperBodyLandmarks(
+function selectBodyLandmarks(
     landmarks: Array<{ x: number; y: number; visibility?: number }>,
-): UpperBodyLandmarks {
-    return {
-        leftShoulder: toPosePoint(landmarks[LEFT_SHOULDER]),
-        rightShoulder: toPosePoint(landmarks[RIGHT_SHOULDER]),
-        leftElbow: toPosePoint(landmarks[LEFT_ELBOW]),
-        rightElbow: toPosePoint(landmarks[RIGHT_ELBOW]),
-    };
+): PoseLandmarkMap {
+    return Object.fromEntries(
+        Object.entries(LANDMARK_INDEXES).map(([key, index]) => [
+            key,
+            toPosePoint(landmarks[index]),
+        ]),
+    ) as PoseLandmarkMap;
 }
 
-function toPosePoint(landmark: { x: number; y: number; visibility?: number }): PosePoint {
+function toPosePoint(landmark?: { x: number; y: number; visibility?: number }): PosePoint {
     return {
-        x: landmark.x,
-        y: landmark.y,
-        visibility: landmark.visibility ?? 0,
+        x: landmark?.x ?? 0,
+        y: landmark?.y ?? 0,
+        visibility: landmark?.visibility ?? 0,
     };
 }

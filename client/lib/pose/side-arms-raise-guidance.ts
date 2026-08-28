@@ -1,4 +1,9 @@
-import type { UpperBodyLandmarks } from "./pose-landmarker.types";
+import {
+    getRequiredExerciseKeyPointVisibility,
+    REQUIRED_VISIBILITY,
+    type ExerciseKeyPointVisibility,
+} from "./exercise-key-points";
+import type { PoseLandmarkMap, PosePoint, UpperBodyLandmarks } from "./pose-landmarker.types";
 
 export type SideArmsRaisePhase =
     | "positioning"
@@ -19,27 +24,15 @@ export interface SideArmsRaiseGuidanceSnapshot {
     message: string;
     hasReliablePose: boolean;
     justCompletedRepetition: boolean;
-    keyPoints: RequiredKeyPointStatus[];
+    keyPoints: ExerciseKeyPointVisibility[];
 }
 
-export interface RequiredKeyPointStatus {
-    id: keyof UpperBodyLandmarks;
-    label: string;
-    isVisible: boolean;
-}
-
-export const REQUIRED_VISIBILITY = 0.6;
 const REQUIRED_CONSECUTIVE_FRAMES = 2;
 const SIDE_HEIGHT_DIFF_THRESHOLD = 0.25;
 const SHOULDER_HEIGHT_LOW_THRESHOLD = 0.35;
 const SHOULDER_HEIGHT_HIGH_THRESHOLD = -0.35;
 const MIN_SIDE_REACH = 0.3;
-const REQUIRED_KEY_POINTS: Array<Pick<RequiredKeyPointStatus, "id" | "label">> = [
-    { id: "leftShoulder", label: "Left shoulder" },
-    { id: "rightShoulder", label: "Right shoulder" },
-    { id: "leftElbow", label: "Left elbow" },
-    { id: "rightElbow", label: "Right elbow" },
-];
+const SIDE_ARMS_RAISE_EXERCISE_NAME = "Side Arms Raise";
 
 export const INITIAL_SIDE_ARMS_RAISE_STATE: SideArmsRaiseGuidanceState = {
     phase: "positioning",
@@ -54,9 +47,11 @@ export function supportsSideArmsRaiseGuidance(exerciseName: string): boolean {
 
 export function updateSideArmsRaiseGuidance(
     previous: SideArmsRaiseGuidanceState,
-    landmarks: UpperBodyLandmarks | null,
+    landmarks: PoseLandmarkMap | null,
 ): SideArmsRaiseGuidanceSnapshot {
-    if (!landmarks || !hasReliableUpperBodyLandmarks(landmarks)) {
+    const upperBodyLandmarks = toUpperBodyLandmarks(landmarks);
+
+    if (!upperBodyLandmarks || !hasReliableUpperBodyLandmarks(upperBodyLandmarks)) {
         return {
             state: {
                 ...previous,
@@ -66,11 +61,14 @@ export function updateSideArmsRaiseGuidance(
             message: "Move fully into the frame so both shoulders and elbows are visible.",
             hasReliablePose: false,
             justCompletedRepetition: false,
-            keyPoints: getRequiredKeyPointStatuses(landmarks),
+            keyPoints: getRequiredExerciseKeyPointVisibility(
+                SIDE_ARMS_RAISE_EXERCISE_NAME,
+                landmarks,
+            ),
         };
     }
 
-    const shoulderWidth = distance(landmarks.leftShoulder, landmarks.rightShoulder);
+    const shoulderWidth = distance(upperBodyLandmarks.leftShoulder, upperBodyLandmarks.rightShoulder);
     if (shoulderWidth < 0.05) {
         return {
             state: {
@@ -81,14 +79,17 @@ export function updateSideArmsRaiseGuidance(
             message: "Face the camera and keep both shoulders visible.",
             hasReliablePose: false,
             justCompletedRepetition: false,
-            keyPoints: getRequiredKeyPointStatuses(landmarks),
+            keyPoints: getRequiredExerciseKeyPointVisibility(
+                SIDE_ARMS_RAISE_EXERCISE_NAME,
+                landmarks,
+            ),
         };
     }
 
-    const leftDrop = (landmarks.leftElbow.y - landmarks.leftShoulder.y) / shoulderWidth;
-    const rightDrop = (landmarks.rightElbow.y - landmarks.rightShoulder.y) / shoulderWidth;
-    const leftReach = Math.abs(landmarks.leftElbow.x - landmarks.leftShoulder.x) / shoulderWidth;
-    const rightReach = Math.abs(landmarks.rightElbow.x - landmarks.rightShoulder.x) / shoulderWidth;
+    const leftDrop = (upperBodyLandmarks.leftElbow.y - upperBodyLandmarks.leftShoulder.y) / shoulderWidth;
+    const rightDrop = (upperBodyLandmarks.rightElbow.y - upperBodyLandmarks.rightShoulder.y) / shoulderWidth;
+    const leftReach = Math.abs(upperBodyLandmarks.leftElbow.x - upperBodyLandmarks.leftShoulder.x) / shoulderWidth;
+    const rightReach = Math.abs(upperBodyLandmarks.rightElbow.x - upperBodyLandmarks.rightShoulder.x) / shoulderWidth;
 
     const armsDown = leftDrop > 0.45 && rightDrop > 0.45;
     const armsAtShoulderHeight =
@@ -163,21 +164,42 @@ export function updateSideArmsRaiseGuidance(
             : correctionMessage ?? guidanceMessage(state, justCompletedRepetition),
         hasReliablePose: true,
         justCompletedRepetition,
-        keyPoints: getRequiredKeyPointStatuses(landmarks),
+        keyPoints: getRequiredExerciseKeyPointVisibility(
+            SIDE_ARMS_RAISE_EXERCISE_NAME,
+            landmarks,
+        ),
     };
-}
-
-export function getRequiredKeyPointStatuses(
-    landmarks: UpperBodyLandmarks | null,
-): RequiredKeyPointStatus[] {
-    return REQUIRED_KEY_POINTS.map((point) => ({
-        ...point,
-        isVisible: (landmarks?.[point.id]?.visibility ?? 0) >= REQUIRED_VISIBILITY,
-    }));
 }
 
 function hasReliableUpperBodyLandmarks(landmarks: UpperBodyLandmarks): boolean {
     return Object.values(landmarks).every((point) => point.visibility >= REQUIRED_VISIBILITY);
+}
+
+function toUpperBodyLandmarks(landmarks: PoseLandmarkMap | null): UpperBodyLandmarks | null {
+    const leftShoulder = landmarks?.leftShoulder;
+    const rightShoulder = landmarks?.rightShoulder;
+    const leftElbow = landmarks?.leftElbow;
+    const rightElbow = landmarks?.rightElbow;
+
+    if (
+        !isPosePoint(leftShoulder)
+        || !isPosePoint(rightShoulder)
+        || !isPosePoint(leftElbow)
+        || !isPosePoint(rightElbow)
+    ) {
+        return null;
+    }
+
+    return {
+        leftShoulder,
+        rightShoulder,
+        leftElbow,
+        rightElbow,
+    };
+}
+
+function isPosePoint(point: PosePoint | undefined): point is PosePoint {
+    return Boolean(point);
 }
 
 function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {

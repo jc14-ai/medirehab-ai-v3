@@ -4,7 +4,24 @@ export interface PosePoint {
     visibility: number;
 }
 
-export interface UpperBodyLandmarks {
+export type PoseLandmarkKey =
+    | "nose"
+    | "leftShoulder"
+    | "rightShoulder"
+    | "leftElbow"
+    | "rightElbow"
+    | "leftWrist"
+    | "rightWrist"
+    | "leftHip"
+    | "rightHip"
+    | "leftKnee"
+    | "rightKnee"
+    | "leftAnkle"
+    | "rightAnkle";
+
+export type PoseLandmarkMap = Partial<Record<PoseLandmarkKey, PosePoint>>;
+
+export interface UpperBodyLandmarks extends PoseLandmarkMap {
     leftShoulder: PosePoint;
     rightShoulder: PosePoint;
     leftElbow: PosePoint;
@@ -26,5 +43,5 @@ export type PoseWorkerRequest =
 
 export type PoseWorkerResponse =
     | { type: "ready" }
-    | { type: "result"; landmarks: UpperBodyLandmarks | null }
+    | { type: "result"; landmarks: PoseLandmarkMap | null }
     | { type: "error"; message: string };
