@@ -104,17 +104,10 @@ export default function DoctorPatientsPage() {
   const archivedAccountCount = patients.filter((patient) => patient.archivedAt).length;
 
   const handleSavePatient = async (data: Partial<ApiPatient & PatientProfile>) => {
+    if (!editingPatient) return;
     setFormLoading(true);
     try {
-      if (editingPatient) {
-        await api.updatePatient(editingPatient.id, data);
-      } else {
-        const res = await api.createPatient(data);
-        if (res.temporaryPassword) {
-          setTemporaryPassword(res.temporaryPassword);
-          setIsTemporaryPasswordOpen(true);
-        }
-      }
+      await api.updatePatient(editingPatient.id, data);
       setIsFormOpen(false);
       setEditingPatient(undefined);
       await loadPatients();
@@ -203,9 +196,6 @@ export default function DoctorPatientsPage() {
             Manage assigned patient accounts and rehabilitation access.
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => { setEditingPatient(undefined); setIsFormOpen(true); }}>
-          Create Patient
-        </button>
       </div>
 
       <div className="card" style={{ padding: "20px" }}>
