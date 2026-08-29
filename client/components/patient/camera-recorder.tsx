@@ -358,11 +358,14 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                         style={{
                             width: "100%",
                             maxWidth: "960px",
+                            height: "min(720px, calc(100dvh - 40px))",
+                            maxHeight: "calc(100dvh - 40px)",
                             backgroundColor: "var(--color-surface)",
                             overflow: "hidden",
                             position: "relative",
                             display: "flex",
                             flexDirection: "column",
+                            minHeight: 0,
                             boxShadow: "var(--shadow-elevated)",
                         }}
                         onClick={(e) => e.stopPropagation()}
@@ -413,8 +416,9 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                             style={{
                                 position: "relative",
                                 backgroundColor: "#000",
-                                aspectRatio: "16/9",
                                 width: "100%",
+                                flex: "1 1 0",
+                                minHeight: 0,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",
@@ -462,7 +466,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                     <video
                                         src={recordedUrl}
                                         controls
-                                        style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }}
+                                        style={{ width: "100%", height: "100%", objectFit: "contain", transform: "scaleX(-1)" }}
                                     />
                                     {isEvaluating && (
                                         <div style={{
@@ -495,7 +499,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                         style={{
                                             width: "100%",
                                             height: "100%",
-                                            objectFit: "cover",
+                                            objectFit: "contain",
                                             transform: "scaleX(-1)", // Mirror the front camera output
                                         }}
                                     />
