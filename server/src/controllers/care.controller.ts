@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
     addDoctorCommentToSession,
     listNotificationsForUser,
+    listSessionsForAdmin,
     listSessionsForDoctorPatient,
     listSessionsForPatient,
     markNotificationRead,
@@ -75,6 +76,19 @@ export const getDoctorPatientSessions = async (
         });
     } catch (error) {
         handleCareError(error, res, "Unable to load patient timeline.");
+    }
+};
+
+export const getAdminSessions = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const sessions = await listSessionsForAdmin();
+
+        res.status(200).json({
+            success: true,
+            sessions
+        });
+    } catch (error) {
+        handleCareError(error, res, "Unable to load admin sessions.");
     }
 };
 

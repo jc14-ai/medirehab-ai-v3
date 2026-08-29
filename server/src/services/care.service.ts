@@ -607,6 +607,17 @@ export const listSessionsForDoctorPatient = async (
     return sessions.map(mapSession);
 };
 
+export const listSessionsForAdmin = async () => {
+    const sessions = await prisma.exerciseSession.findMany({
+        orderBy: {
+            performedAt: "desc"
+        },
+        select: sessionSelect
+    });
+
+    return sessions.map(mapSession);
+};
+
 export const listNotificationsForUser = async (userId: string) => {
     return prisma.notification.findMany({
         where: { userId },

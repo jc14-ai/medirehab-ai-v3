@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Role } from "@prisma/client";
 import {
     addDoctorComment,
+    getAdminSessions,
     getDoctorPatientSessions,
     getMyNotifications,
     getMySessions,
@@ -30,7 +31,13 @@ router.get(
     getDoctorPatientSessions
 );
 
-
+router.get(
+    "/admin/sessions",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    getAdminSessions
+);
 
 router.post(
     "/sessions/:sessionId/check-in",
