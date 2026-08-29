@@ -261,6 +261,12 @@ export const api = {
     });
   },
 
+  permanentlyDeleteDoctor(userId: string) {
+    return request<ApiResponse>(`/users/doctors/${userId}/trash`, {
+      method: "DELETE",
+    });
+  },
+
   // --- Admin: Patients ---
   getAdminPatients() {
     return request<{ success: boolean; patients: ApiPatient[] }>("/users/admin/patients").then((res) => ({
@@ -297,6 +303,18 @@ export const api = {
 
   deleteExercise(exerciseId: string) {
     return request<ApiResponse>(`/exercises/${exerciseId}`, {
+      method: "DELETE",
+    });
+  },
+
+  restoreExercise(exerciseId: string) {
+    return request<{ success: boolean; exercise: ApiExercise }>(`/exercises/${exerciseId}/restore`, {
+      method: "PATCH",
+    });
+  },
+
+  permanentlyDeleteExercise(exerciseId: string) {
+    return request<ApiResponse>(`/exercises/${exerciseId}/trash`, {
       method: "DELETE",
     });
   },
@@ -358,6 +376,12 @@ export const api = {
 
   deletePatient(userId: string) {
     return request<ApiResponse>(`/users/patients/${userId}`, {
+      method: "DELETE",
+    });
+  },
+
+  permanentlyDeletePatient(userId: string) {
+    return request<ApiResponse>(`/users/patients/${userId}/trash`, {
       method: "DELETE",
     });
   },
