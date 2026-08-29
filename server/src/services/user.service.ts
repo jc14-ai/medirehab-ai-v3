@@ -130,6 +130,20 @@ const ensureRoleUser = async (
     }
 };
 
+const ensureArchivedRoleUser = async (
+    userId: string,
+    role: Role
+): Promise<void> => {
+    const user = await prisma.user.findFirst({
+        where: { id: userId, role, archivedAt: { not: null } },
+        select: { id: true }
+    });
+
+    if (!user) {
+        throw new HttpError(409, `User must be archived before it can be deleted permanently.`);
+    }
+};
+
 const getArchivedAtForStatus = (isActive: boolean): Date | null => {
     return isActive ? null : new Date();
 };
@@ -656,5 +670,60 @@ export const updatePatientProfile = async (
         select: {
             ...patientUserSelect
         }
+    });
+};
+
+export const deleteDoctorUserPermanently = async (doctorUserId: string) => {
+    const doctor = await prisma.user.findFirst({
+        where: {
+            id: doctorUserId,
+            role: Role.DOCTOR,
+            archivedAt: { not: null }
+        },
+        select: {
+            id: true,
+            doctorProfile: {
+                select: { id: true }
+            }
+        }
+    });
+
+    if (!doctor) {
+        throw new HttpError(409, "Doctor must be archived before it can be deleted permanently.");
+    }
+
+    const doctorProfile = doctor.doctorProfile;
+
+    if (!doctorProfile) {
+        await prisma.user.delete({
+            where: { id: doctorUserId }
+        });
+        return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+        await tx.patientProfile.updateMany({
+            where: { assignedDoctorId: doctorProfile.id },
+            data: { assignedDoctorId: null }
+        });
+
+        await tx.exerciseAssignment.deleteMany({
+            where: { assignedByDoctorId: doctorProfile.id }
+        });
+
+        await tx.user.delete({
+            where: { id: doctorUserId }
+        });
+    });
+};
+
+export const deletePatientUserPermanently = async (patientUserId: string) => {
+    await ensureArchivedRoleUser(
+        patientUserId,
+        Role.PATIENT
+    );
+
+    await prisma.user.delete({
+        where: { id: patientUserId }
     });
 };
