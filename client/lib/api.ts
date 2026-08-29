@@ -339,6 +339,10 @@ export const api = {
     }));
   },
 
+  getAdminCareSessions() {
+    return request<{ success: boolean; sessions: CareSession[] }>("/care/admin/sessions");
+  },
+
   getPatient(userId: string) {
     return request<{ success: boolean; patient: ApiPatient }>(`/users/patients/${userId}`).then((res) => ({
       ...res,
