@@ -3,6 +3,8 @@ import { Role } from "@prisma/client";
 import {
     assignPatientToDoctor,
     changeOwnPassword,
+    deleteDoctorUserPermanently,
+    deletePatientUserPermanently,
     createDoctorUser,
     createPatientUser,
     getDoctorByUserId,
@@ -377,6 +379,34 @@ export const archivePatient = async (req: Request, res: Response): Promise<void>
         });
     } catch (error) {
         handleUserError(error, res, "Unable to archive patient.");
+    }
+};
+
+export const deleteDoctorPermanently = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = validateUserIdParam(req.params.userId);
+        await deleteDoctorUserPermanently(userId);
+
+        res.status(200).json({
+            success: true,
+            message: "Doctor permanently deleted successfully."
+        });
+    } catch (error) {
+        handleUserError(error, res, "Unable to permanently delete doctor.");
+    }
+};
+
+export const deletePatientPermanently = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const userId = validateUserIdParam(req.params.userId);
+        await deletePatientUserPermanently(userId);
+
+        res.status(200).json({
+            success: true,
+            message: "Patient permanently deleted successfully."
+        });
+    } catch (error) {
+        handleUserError(error, res, "Unable to permanently delete patient.");
     }
 };
 
