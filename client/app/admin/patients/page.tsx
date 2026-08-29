@@ -35,11 +35,23 @@ function ArchiveIcon() {
   );
 }
 
-function ToggleIcon({ isActive }: { isActive: boolean }) {
+function TrashIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1" y="5" width="22" height="14" rx="7" ry="7" />
-      <circle cx={isActive ? "16" : "8"} cy="12" r="3" fill={isActive ? "var(--color-primary)" : "currentColor"} />
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
+function RestoreIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 3v6h6" />
     </svg>
   );
 }
@@ -84,6 +96,7 @@ export default function AdminPatientsPage() {
   const [patients, setPatients] = useState<ApiPatient[]>([]);
   const [doctors, setDoctors] = useState<ApiDoctor[]>([]);
   const [selectedDoctors, setSelectedDoctors] = useState<Record<string, string>>({});
+  const [viewingPatient, setViewingPatient] = useState<ApiPatient | null>(null);
   const [savingPatientId, setSavingPatientId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -203,27 +216,6 @@ export default function AdminPatientsPage() {
     }
   };
 
-  const handleToggleStatus = (patient: ApiPatient) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: `${patient.isActive ? "Deactivate" : "Activate"} Patient`,
-      message: `Are you sure you want to ${patient.isActive ? "deactivate" : "activate"} ${patientName(patient)}?`,
-      isDestructive: patient.isActive,
-      isLoading: false,
-      action: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
-        try {
-          await api.updatePatientStatus(patient.id, !patient.isActive);
-          await loadData();
-        } catch (err) {
-          alert(err instanceof ApiError ? err.message : "Operation failed");
-        } finally {
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
-        }
-      },
-    });
-  };
-
   const handleArchive = (patient: ApiPatient) => {
     setConfirmDialog({
       isOpen: true,
@@ -243,6 +235,52 @@ export default function AdminPatientsPage() {
         }
       },
     });
+  };
+
+  const handlePermanentDelete = (patient: ApiPatient) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Patient Permanently",
+      message: `Delete ${patientName(patient)} permanently? This will remove the account and related patient data from the database.`,
+      isDestructive: true,
+      isLoading: false,
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await api.permanentlyDeletePatient(patient.id);
+          await loadData();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.message : "Delete failed");
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      },
+    });
+  };
+
+  const handleRestore = (patient: ApiPatient) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Restore Patient",
+      message: `Restore ${patientName(patient)} to active use?`,
+      isDestructive: false,
+      isLoading: false,
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await api.updatePatientStatus(patient.id, true);
+          await loadData();
+        } catch (err) {
+          alert(err instanceof ApiError ? err.message : "Restore failed");
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      },
+    });
+  };
+
+  const openPatientPersona = (patient: ApiPatient) => {
+    setViewingPatient(patient);
   };
 
   const handleResetPassword = (patient: ApiPatient) => {
@@ -367,7 +405,21 @@ export default function AdminPatientsPage() {
                   filteredPatients.map((patient) => (
                     <tr key={patient.id} style={{ borderBottom: "1px solid var(--color-page-bg)" }}>
                       <td style={{ padding: "12px 16px" }}>
-                        <div style={{ fontWeight: 600 }}>{patientName(patient)}</div>
+                        <button
+                          type="button"
+                          onClick={() => openPatientPersona(patient)}
+                          style={{
+                            fontWeight: 600,
+                            color: "var(--color-primary)",
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            cursor: "pointer",
+                            textAlign: "left",
+                          }}
+                        >
+                          {patientName(patient)}
+                        </button>
                         <div style={{ color: "var(--color-text-muted)", fontSize: "13px" }}>{patient.email}</div>
                       </td>
                       <td style={{ padding: "12px 16px", color: "var(--color-text-secondary)", fontSize: "14px" }}>
@@ -400,11 +452,11 @@ export default function AdminPatientsPage() {
                         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center" }}>
                           {accountTab === "ACTIVE" && (
                             <>
-                              <button
-                                className="btn btn-primary"
-                                onClick={() => handleAssign(patient)}
-                                disabled={savingPatientId === patient.id || !selectedDoctors[patient.id]}
-                                style={{ height: "36px", padding: "0 14px", marginRight: "8px" }}
+                          <button
+                            className="btn btn-primary"
+                            onClick={() => handleAssign(patient)}
+                            disabled={savingPatientId === patient.id || !selectedDoctors[patient.id]}
+                            style={{ height: "36px", padding: "0 14px", marginRight: "8px" }}
                               >
                                 {savingPatientId === patient.id ? <div className="spinner spinner-white" style={{ width: "16px", height: "16px" }} /> : "Assign"}
                               </button>
@@ -424,13 +476,6 @@ export default function AdminPatientsPage() {
                           >
                             <KeyIcon />
                           </button>
-                          <button
-                            title={patient.isActive ? "Deactivate" : "Activate"}
-                            style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", padding: "4px" }}
-                            onClick={() => handleToggleStatus(patient)}
-                          >
-                            <ToggleIcon isActive={patient.isActive} />
-                          </button>
                           {!patient.archivedAt && (
                             <button
                               title="Archive"
@@ -438,6 +483,24 @@ export default function AdminPatientsPage() {
                               onClick={() => handleArchive(patient)}
                             >
                               <ArchiveIcon />
+                            </button>
+                          )}
+                          {patient.archivedAt && (
+                            <button
+                              title="Restore"
+                              style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", padding: "4px" }}
+                              onClick={() => handleRestore(patient)}
+                            >
+                              <RestoreIcon />
+                            </button>
+                          )}
+                          {patient.archivedAt && (
+                            <button
+                              title="Delete permanently"
+                              style={{ background: "none", border: "none", color: "var(--color-danger)", cursor: "pointer", padding: "4px" }}
+                              onClick={() => handlePermanentDelete(patient)}
+                            >
+                              <TrashIcon />
                             </button>
                           )}
                         </div>
@@ -474,6 +537,74 @@ export default function AdminPatientsPage() {
         password={tempPassword}
         onClose={() => setIsTempPasswordOpen(false)}
       />
+
+      {viewingPatient && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: "20px",
+          }}
+          onClick={() => setViewingPatient(null)}
+        >
+          <div
+            className="card animate-slide-up"
+            style={{ width: "100%", maxWidth: "720px", padding: "24px", maxHeight: "90vh", overflowY: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "20px" }}>
+              <div>
+                <h2 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px 0", color: "var(--color-text-primary)" }}>
+                  {patientName(viewingPatient)}
+                </h2>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                  <StatusBadge isActive={viewingPatient.isActive} archivedAt={viewingPatient.archivedAt} />
+                  <span style={{ color: "var(--color-text-muted)", fontSize: "14px" }}>{viewingPatient.email}</span>
+                </div>
+              </div>
+              <button
+                className="btn btn-secondary"
+                style={{ minWidth: "auto", height: "36px", padding: "0 12px" }}
+                onClick={() => setViewingPatient(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            <h3 style={{ fontSize: "16px", fontWeight: 600, margin: "0 0 16px 0", color: "var(--color-text-primary)" }}>
+              Persona Information
+            </h3>
+
+            <div className="doctor-form-grid">
+              <DetailField label="First Name" value={viewingPatient.profile?.firstName} />
+              <DetailField label="Last Name" value={viewingPatient.profile?.lastName} />
+              <DetailField label="Birth Date" value={viewingPatient.profile?.birthDate?.slice(0, 10)} />
+              <DetailField label="Gender" value={viewingPatient.profile?.gender} />
+              <DetailField label="Contact Number" value={viewingPatient.profile?.contactNumber} />
+              <DetailField label="Assigned Doctor" value={assignedDoctorName(viewingPatient)} />
+            </div>
+
+            <div style={{ marginTop: "20px", display: "grid", gap: "16px" }}>
+              <DetailField label="Address" value={viewingPatient.profile?.address} />
+              <DetailField label="Medical Condition" value={viewingPatient.profile?.medicalCondition} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div>
+      <div style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: "4px" }}>{label}</div>
+      <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{value || "-"}</div>
     </div>
   );
 }
