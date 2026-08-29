@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, type ApiExercise, ApiError } from "@/lib/api";
+import { api, type ApiExercise, ApiError, type ExerciseImage } from "@/lib/api";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ExerciseForm } from "@/components/admin/exercise-form";
@@ -34,11 +34,43 @@ function ArchiveIcon() {
   );
 }
 
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
+function RestoreIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 3v6h6" />
+    </svg>
+  );
+}
+
+function ActiveExercisesIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <polyline points="16 11 18 13 22 9" />
+    </svg>
+  );
+}
+
 export default function ExercisesPage() {
   const [exercises, setExercises] = useState<ApiExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [accountTab, setAccountTab] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState<ApiExercise | undefined>(undefined);
@@ -73,10 +105,11 @@ export default function ExercisesPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadExercises();
   }, []);
 
-  const handleSaveExercise = async (data: { name: string; description: string; images: any[] }) => {
+  const handleSaveExercise = async (data: { name: string; description: string; images: ExerciseImage[] }) => {
     setFormLoading(true);
     try {
       if (editingExercise) {
@@ -86,6 +119,7 @@ export default function ExercisesPage() {
       }
       await loadExercises();
       setIsFormOpen(false);
+      setEditingExercise(undefined);
     } catch (err) {
       if (err instanceof ApiError) alert(err.message);
       else alert("Failed to save exercise");
@@ -115,9 +149,57 @@ export default function ExercisesPage() {
     });
   };
 
-  const filteredExercises = exercises.filter((ex) =>
-    (ex.name || ex.id).toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handlePermanentDelete = (exercise: ApiExercise) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Exercise Permanently",
+      message: `Delete "${exercise.name}" permanently? This will remove the exercise and all related images, assignments, and session history.`,
+      isLoading: false,
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await api.permanentlyDeleteExercise(exercise.id);
+          await loadExercises();
+        } catch (err) {
+          if (err instanceof ApiError) alert(err.message);
+          else alert("Operation failed");
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      },
+    });
+  };
+
+  const handleRestore = (exercise: ApiExercise) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Restore Exercise",
+      message: `Restore "${exercise.name}" to active use?`,
+      isLoading: false,
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await api.restoreExercise(exercise.id);
+          await loadExercises();
+        } catch (err) {
+          if (err instanceof ApiError) alert(err.message);
+          else alert("Operation failed");
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      },
+    });
+  };
+
+  const activeAccountCount = exercises.filter((exercise) => !exercise.archivedAt).length;
+  const archivedAccountCount = exercises.filter((exercise) => exercise.archivedAt).length;
+  const filteredExercises = exercises.filter((exercise) => {
+    const isArchived = Boolean(exercise.archivedAt);
+    const matchesTab = accountTab === "ARCHIVED" ? isArchived : !isArchived;
+    const matchesSearch = (exercise.name || exercise.id).toLowerCase().includes(searchTerm.toLowerCase());
+
+    return matchesTab && matchesSearch;
+  });
 
   return (
     <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -127,7 +209,7 @@ export default function ExercisesPage() {
             Exercises
           </h1>
           <p style={{ fontSize: "15px", color: "var(--color-text-secondary)", margin: 0 }}>
-            Manage the platform's exercise catalog.
+            Manage the platform&apos;s exercise catalog.
           </p>
         </div>
         <button
@@ -142,7 +224,34 @@ export default function ExercisesPage() {
       </div>
 
       <div className="card" style={{ padding: "20px" }}>
-        <div style={{ marginBottom: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "16px", marginBottom: "20px", flexWrap: "wrap" }}>
+          <div className="account-tabs" role="tablist" aria-label="Exercise account status">
+            <button
+              type="button"
+              className={`account-tab ${accountTab === "ACTIVE" ? "account-tab-active" : ""}`}
+              onClick={() => setAccountTab("ACTIVE")}
+              role="tab"
+              aria-selected={accountTab === "ACTIVE"}
+              aria-label={`Active exercises, ${activeAccountCount}`}
+              title="Active exercises"
+            >
+              <ActiveExercisesIcon />
+              <span className="account-tab-count">{activeAccountCount}</span>
+            </button>
+            <button
+              type="button"
+              className={`account-tab ${accountTab === "ARCHIVED" ? "account-tab-active" : ""}`}
+              onClick={() => setAccountTab("ARCHIVED")}
+              role="tab"
+              aria-selected={accountTab === "ARCHIVED"}
+              aria-label={`Archived exercises, ${archivedAccountCount}`}
+              title="Archived exercises"
+            >
+              <ArchiveIcon />
+              <span className="account-tab-count">{archivedAccountCount}</span>
+            </button>
+          </div>
+
           <input
             type="text"
             className="input"
@@ -167,7 +276,7 @@ export default function ExercisesPage() {
           <div>
             {filteredExercises.length === 0 ? (
               <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
-                No exercises found.
+                {accountTab === "ARCHIVED" ? "No archived exercises found." : "No active exercises found."}
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(285px, 1fr))", gap: "20px" }}>
@@ -238,13 +347,31 @@ export default function ExercisesPage() {
                             >
                               <EditIcon />
                             </button>
-                            {!exercise.archivedAt && (
+                            {accountTab === "ACTIVE" && !exercise.archivedAt && (
                               <button
                                 title="Archive"
                                 style={{ background: "none", border: "none", color: "var(--color-danger)", cursor: "pointer", padding: "4px" }}
                                 onClick={(e) => { e.stopPropagation(); handleArchive(exercise); }}
                               >
                                 <ArchiveIcon />
+                              </button>
+                            )}
+                            {accountTab === "ARCHIVED" && exercise.archivedAt && (
+                              <button
+                                title="Restore"
+                                style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", padding: "4px" }}
+                                onClick={(e) => { e.stopPropagation(); handleRestore(exercise); }}
+                              >
+                                <RestoreIcon />
+                              </button>
+                            )}
+                            {accountTab === "ARCHIVED" && exercise.archivedAt && (
+                              <button
+                                title="Delete permanently"
+                                style={{ background: "none", border: "none", color: "var(--color-danger)", cursor: "pointer", padding: "4px" }}
+                                onClick={(e) => { e.stopPropagation(); handlePermanentDelete(exercise); }}
+                              >
+                                <TrashIcon />
                               </button>
                             )}
                           </div>
@@ -263,7 +390,10 @@ export default function ExercisesPage() {
         isOpen={isFormOpen}
         initialData={editingExercise}
         onSave={handleSaveExercise}
-        onCancel={() => setIsFormOpen(false)}
+        onCancel={() => {
+          setIsFormOpen(false);
+          setEditingExercise(undefined);
+        }}
         isLoading={formLoading}
       />
 
