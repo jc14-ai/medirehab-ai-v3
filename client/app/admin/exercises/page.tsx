@@ -42,6 +42,7 @@ export default function ExercisesPage() {
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingExercise, setEditingExercise] = useState<ApiExercise | undefined>(undefined);
+  const [viewingExercise, setViewingExercise] = useState<ApiExercise | undefined>(undefined);
   const [formLoading, setFormLoading] = useState(false);
 
   const [confirmDialog, setConfirmDialog] = useState<{
@@ -81,7 +82,7 @@ export default function ExercisesPage() {
       if (editingExercise) {
         await api.updateExercise(editingExercise.id, data);
       } else {
-        await api.createExercise({ ...data, exercise: data.name }); // Pass 'exercise' as fallback for backend API mapping if needed
+        await api.createExercise({ ...data, exercise: data.name });
       }
       await loadExercises();
       setIsFormOpen(false);
@@ -163,64 +164,97 @@ export default function ExercisesPage() {
             <div className="spinner"></div>
           </div>
         ) : (
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-              <thead>
-                <tr style={{ borderBottom: "1px solid var(--color-border)", color: "var(--color-text-muted)", fontSize: "14px" }}>
-                  <th style={{ padding: "12px 16px", fontWeight: 600 }}>Name</th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600 }}>Description</th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600 }}>Images</th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600 }}>Status</th>
-                  <th style={{ padding: "12px 16px", fontWeight: 600, textAlign: "right" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredExercises.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)" }}>
-                      No exercises found.
-                    </td>
-                  </tr>
-                ) : (
-                  filteredExercises.map((exercise) => (
-                    <tr key={exercise.id} style={{ borderBottom: "1px solid var(--color-page-bg)", transition: "background-color 0.15s ease" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--color-primary-soft)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}>
-                      <td style={{ padding: "12px 16px", fontWeight: 500, color: "var(--color-text-primary)" }}>
-                        {exercise.name || exercise.id}
-                      </td>
-                      <td style={{ padding: "12px 16px", color: "var(--color-text-secondary)", fontSize: "14px", maxWidth: "300px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {exercise.description || "-"}
-                      </td>
-                      <td style={{ padding: "12px 16px", color: "var(--color-text-secondary)", fontSize: "14px" }}>
-                        {exercise.images?.length || 0}
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <StatusBadge isActive={!exercise.archivedAt} archivedAt={exercise.archivedAt} />
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                          <button
-                            title="Edit"
-                            style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", padding: "4px" }}
-                            onClick={() => { setEditingExercise(exercise); setIsFormOpen(true); }}
-                          >
-                            <EditIcon />
-                          </button>
-                          {!exercise.archivedAt && (
-                            <button
-                              title="Archive"
-                              style={{ background: "none", border: "none", color: "var(--color-danger)", cursor: "pointer", padding: "4px" }}
-                              onClick={() => handleArchive(exercise)}
-                            >
-                              <ArchiveIcon />
-                            </button>
-                          )}
+          <div>
+            {filteredExercises.length === 0 ? (
+              <div style={{ padding: "40px", textAlign: "center", color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-lg)" }}>
+                No exercises found.
+              </div>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(285px, 1fr))", gap: "20px" }}>
+                {filteredExercises.map((exercise) => {
+                  const mainImage = exercise.images && exercise.images.length > 0 ? exercise.images[0].filepath : null;
+                  return (
+                    <div
+                      key={exercise.id}
+                      className="card"
+                      style={{ display: "flex", flexDirection: "column", overflow: "hidden", border: "1px solid var(--color-border)", padding: 0, cursor: "pointer", transition: "transform 0.15s ease, box-shadow 0.15s ease" }}
+                      onClick={() => setViewingExercise(exercise)}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow = "var(--shadow-md)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    >
+                      <div style={{ height: "160px", backgroundColor: "var(--color-page-bg)", position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", borderBottom: "1px solid var(--color-border)" }}>
+                        {mainImage ? (
+                          <img
+                            src={mainImage}
+                            alt={exercise.name}
+                            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                              const fallbackParent = e.currentTarget.parentElement;
+                              if (fallbackParent) {
+                                const placeholderEl = fallbackParent.querySelector(".fallback-placeholder");
+                                if (placeholderEl) (placeholderEl as HTMLElement).style.display = "flex";
+                              }
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          className="fallback-placeholder"
+                          style={{
+                            display: mainImage ? "none" : "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            color: "var(--color-text-muted)",
+                          }}
+                        >
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                            <path d="M6.5 6.5h11M6.5 17.5h11M3 12h18M6.5 6.5v11M17.5 6.5v11" />
+                          </svg>
+                          <span style={{ fontSize: "12px", marginTop: "8px" }}>No image</span>
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+                        <div style={{ position: "absolute", top: "12px", right: "12px" }}>
+                          <StatusBadge isActive={!exercise.archivedAt} archivedAt={exercise.archivedAt} />
+                        </div>
+                      </div>
+                      <div style={{ padding: "16px", display: "flex", flexDirection: "column", flex: 1 }}>
+                        <h3 style={{ fontSize: "18px", fontWeight: 600, margin: "0 0 8px 0", color: "var(--color-text-primary)" }}>
+                          {exercise.name || exercise.id}
+                        </h3>
+                        <p style={{ fontSize: "14px", color: "var(--color-text-secondary)", margin: "0 0 16px 0", flex: 1, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", textOverflow: "ellipsis", minHeight: "60px" }}>
+                          {exercise.description || "-"}
+                        </p>
+                        <div style={{ display: "flex", justifyContent: "flex-end", borderTop: "1px solid var(--color-page-bg)", paddingTop: "12px", marginTop: "auto" }}>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <button
+                              title="Edit"
+                              style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", padding: "4px" }}
+                              onClick={(e) => { e.stopPropagation(); setEditingExercise(exercise); setIsFormOpen(true); }}
+                            >
+                              <EditIcon />
+                            </button>
+                            {!exercise.archivedAt && (
+                              <button
+                                title="Archive"
+                                style={{ background: "none", border: "none", color: "var(--color-danger)", cursor: "pointer", padding: "4px" }}
+                                onClick={(e) => { e.stopPropagation(); handleArchive(exercise); }}
+                              >
+                                <ArchiveIcon />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -242,6 +276,75 @@ export default function ExercisesPage() {
         onConfirm={confirmDialog.action}
         onCancel={() => setConfirmDialog((prev) => ({ ...prev, isOpen: false }))}
       />
+
+      {/* Details Display Modal */}
+      {viewingExercise && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: "20px",
+          }}
+          onClick={() => setViewingExercise(undefined)}
+        >
+          <div
+            className="card animate-slide-up"
+            style={{ width: "100%", maxWidth: "600px", padding: "24px", maxHeight: "90vh", overflowY: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+              <h3 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "var(--color-text-primary)" }}>
+                {viewingExercise.name}
+              </h3>
+              <button
+                className="btn btn-secondary"
+                style={{ padding: "4px 8px", minWidth: "auto", height: "auto" }}
+                onClick={() => setViewingExercise(undefined)}
+              >
+                Close
+              </button>
+            </div>
+            
+            <p style={{ fontSize: "15px", color: "var(--color-text-secondary)", lineHeight: "1.6", marginBottom: "20px", whiteSpace: "pre-wrap" }}>
+              {viewingExercise.description || "No description provided."}
+            </p>
+
+            <h4 style={{ fontSize: "14px", fontWeight: 600, marginBottom: "12px", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Exercise Images ({viewingExercise.images?.length || 0})
+            </h4>
+
+            {viewingExercise.images && viewingExercise.images.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {viewingExercise.images.map((img, index) => (
+                  <div key={index} style={{ border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", overflow: "hidden", backgroundColor: "var(--color-page-bg)" }}>
+                    <div style={{ height: "240px", width: "100%", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "#fff" }}>
+                      <img
+                        src={img.filepath}
+                        alt={img.imageName || `Image ${index + 1}`}
+                        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+                      />
+                    </div>
+                    {img.imageName && (
+                      <div style={{ padding: "8px 12px", fontSize: "13px", fontWeight: 500, color: "var(--color-text-primary)", borderTop: "1px solid var(--color-border)" }}>
+                        {img.imageName}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: "24px", textAlign: "center", color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: "var(--radius-md)" }}>
+                No images uploaded for this exercise.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
