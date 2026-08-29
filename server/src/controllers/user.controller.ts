@@ -13,11 +13,14 @@ import {
     listPatientsForDoctor,
     resetDoctorPassword,
     resetPatientPasswordForDoctor,
+    resetPatientPassword,
     updateDoctorAccountStatus,
     updateDoctorProfile,
     updateOwnPatientProfile,
     updatePatientAccountStatusForDoctor,
-    updatePatientProfileForDoctor
+    updatePatientProfileForDoctor,
+    updatePatientAccountStatus,
+    updatePatientProfile
 } from "../services/user.service";
 import { HttpError } from "../utils/httpError";
 import {
@@ -77,12 +80,8 @@ export const createDoctor = async (req: Request, res: Response): Promise<void> =
 
 export const createPatient = async (req: Request, res: Response): Promise<void> => {
     try {
-        const authUser = getAuthenticatedUser(req);
         const input = validateCreatePatientInput(req.body);
-        const { patient, temporaryPassword } = await createPatientUser(
-            input,
-            authUser.userId
-        );
+        const { patient, temporaryPassword } = await createPatientUser(input);
 
         res.status(201).json({
             success: true,
@@ -199,11 +198,10 @@ export const updatePatient = async (req: Request, res: Response): Promise<void> 
         const authUser = getAuthenticatedUser(req);
         const userId = validateUserIdParam(req.params.userId);
         const input = validateUpdatePatientInput(req.body);
-        const patient = await updatePatientProfileForDoctor(
-            userId,
-            authUser.userId,
-            input
-        );
+        
+        const patient = authUser.role === Role.ADMIN
+            ? await updatePatientProfile(userId, input)
+            : await updatePatientProfileForDoctor(userId, authUser.userId, input);
 
         res.status(200).json({
             success: true,
@@ -290,7 +288,12 @@ export const resetPatientAccountPassword = async (
         const authUser = getAuthenticatedUser(req);
         const userId = validateUserIdParam(req.params.userId);
         const input = validateResetPasswordInput(req.body);
-        await resetPatientPasswordForDoctor(userId, authUser.userId, input);
+
+        if (authUser.role === Role.ADMIN) {
+            await resetPatientPassword(userId, input);
+        } else {
+            await resetPatientPasswordForDoctor(userId, authUser.userId, input);
+        }
 
         res.status(200).json({
             success: true,
@@ -328,11 +331,10 @@ export const updatePatientStatus = async (
         const authUser = getAuthenticatedUser(req);
         const userId = validateUserIdParam(req.params.userId);
         const input = validateAccountStatusInput(req.body);
-        const patient = await updatePatientAccountStatusForDoctor(
-            userId,
-            authUser.userId,
-            input
-        );
+        
+        const patient = authUser.role === Role.ADMIN
+            ? await updatePatientAccountStatus(userId, input)
+            : await updatePatientAccountStatusForDoctor(userId, authUser.userId, input);
 
         res.status(200).json({
             success: true,
@@ -363,11 +365,10 @@ export const archivePatient = async (req: Request, res: Response): Promise<void>
     try {
         const authUser = getAuthenticatedUser(req);
         const userId = validateUserIdParam(req.params.userId);
-        const patient = await updatePatientAccountStatusForDoctor(
-            userId,
-            authUser.userId,
-            { isActive: false }
-        );
+        
+        const patient = authUser.role === Role.ADMIN
+            ? await updatePatientAccountStatus(userId, { isActive: false })
+            : await updatePatientAccountStatusForDoctor(userId, authUser.userId, { isActive: false });
 
         res.status(200).json({
             success: true,

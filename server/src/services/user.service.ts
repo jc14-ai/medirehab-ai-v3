@@ -235,12 +235,9 @@ export const createDoctorUser = async (input: ValidatedCreateDoctorInput) => {
 };
 
 export const createPatientUser = async (
-    input: ValidatedCreatePatientInput,
-    createdByUserId: string
+    input: ValidatedCreatePatientInput
 ) => {
     await ensureEmailAvailable(input.email);
-
-    const doctorProfileId = await getDoctorProfileIdForUser(createdByUserId);
 
     const temporaryPassword = generateTemporaryPassword();
     const hashedPassword = await hashPassword(temporaryPassword);
@@ -260,7 +257,7 @@ export const createPatientUser = async (
                     contactNumber: input.contactNumber ?? null,
                     address: input.address ?? null,
                     medicalCondition: input.medicalCondition ?? null,
-                    assignedDoctorId: doctorProfileId
+                    assignedDoctorId: null
                 }
             }
         },
@@ -607,6 +604,51 @@ export const assignPatientToDoctor = async (
         data: {
             assignedDoctorId: doctor.doctorProfile.id
         }
+    });
+
+    return prisma.user.findUnique({
+        where: { id: patientUserId },
+        select: {
+            ...patientUserSelect
+        }
+    });
+};
+
+export const resetPatientPassword = async (
+    patientUserId: string,
+    input: ValidatedResetPasswordInput
+) => {
+    await ensureRoleUser(patientUserId, Role.PATIENT, "Patient not found.");
+    await updateUserPassword(patientUserId, input.password);
+};
+
+export const updatePatientAccountStatus = async (
+    patientUserId: string,
+    input: ValidatedAccountStatusInput
+) => {
+    await ensureRoleUser(patientUserId, Role.PATIENT, "Patient not found.");
+
+    return prisma.user.update({
+        where: { id: patientUserId },
+        data: {
+            isActive: input.isActive,
+            archivedAt: getArchivedAtForStatus(input.isActive)
+        },
+        select: {
+            ...patientUserSelect
+        }
+    });
+};
+
+export const updatePatientProfile = async (
+    patientUserId: string,
+    input: ValidatedUpdatePatientInput
+) => {
+    await ensureRoleUser(patientUserId, Role.PATIENT, "Patient not found.");
+
+    await prisma.patientProfile.update({
+        where: { userId: patientUserId },
+        data: buildPatientProfileUpdateData(input)
     });
 
     return prisma.user.findUnique({

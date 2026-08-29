@@ -78,7 +78,7 @@ router.post(
     "/patients",
     authMiddleware,
     requirePasswordChanged,
-    requireRole(Role.DOCTOR),
+    requireRole(Role.ADMIN),
     createPatient
 );
 
@@ -108,14 +108,14 @@ router.patch(
     "/patients/:userId/password",
     authMiddleware,
     requirePasswordChanged,
-    requireRole(Role.DOCTOR),
+    requireRole(Role.ADMIN, Role.DOCTOR),
     resetPatientAccountPassword
 );
 router.patch(
     "/patients/:userId/status",
     authMiddleware,
     requirePasswordChanged,
-    requireRole(Role.DOCTOR),
+    requireRole(Role.ADMIN, Role.DOCTOR),
     updatePatientStatus
 );
 router.patch(
@@ -129,7 +129,7 @@ router.patch(
     "/patients/:userId",
     authMiddleware,
     requirePasswordChanged,
-    requireRole(Role.DOCTOR),
+    requireRole(Role.ADMIN, Role.DOCTOR),
     updatePatient
 );
 
@@ -144,7 +144,7 @@ router.delete(
     "/patients/:userId",
     authMiddleware,
     requirePasswordChanged,
-    requireRole(Role.DOCTOR),
+    requireRole(Role.ADMIN, Role.DOCTOR),
     archivePatient
 );
 
