@@ -6,6 +6,8 @@ import {
     assignDoctorToPatient,
     createDoctor,
     createPatient,
+    deleteDoctorPermanently,
+    deletePatientPermanently,
     getAdminPatients,
     getDoctor,
     getDoctors,
@@ -141,11 +143,25 @@ router.delete(
     archiveDoctor
 );
 router.delete(
+    "/doctors/:userId/trash",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    deleteDoctorPermanently
+);
+router.delete(
     "/patients/:userId",
     authMiddleware,
     requirePasswordChanged,
     requireRole(Role.ADMIN, Role.DOCTOR),
     archivePatient
+);
+router.delete(
+    "/patients/:userId/trash",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    deletePatientPermanently
 );
 
 export default router;

@@ -4,11 +4,13 @@ import {
     archiveExerciseCatalogItem,
     assignExercise,
     createExerciseCatalogItem,
+    deleteExerciseCatalogItemPermanently,
     getAssignedExercisesForPatient,
     getAvailableExercisesForPatient,
     getExercises,
     getMyAssignedExercises,
     removeAssignedExercise,
+    restoreExerciseCatalogItem,
     updateExerciseCatalogItem,
     evaluateExerciseAssignment
 } from "../controllers/exercise.controller";
@@ -63,6 +65,20 @@ router.delete(
     requirePasswordChanged,
     requireRole(Role.ADMIN),
     archiveExerciseCatalogItem
+);
+router.patch(
+    "/:exerciseId/restore",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    restoreExerciseCatalogItem
+);
+router.delete(
+    "/:exerciseId/trash",
+    authMiddleware,
+    requirePasswordChanged,
+    requireRole(Role.ADMIN),
+    deleteExerciseCatalogItemPermanently
 );
 
 router.get(
