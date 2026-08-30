@@ -19,8 +19,6 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const [error, setError] = useState<string | null>(null);
     const [isEvaluating, setIsEvaluating] = useState(false);
     const [evaluationScore, setEvaluationScore] = useState<number | null>(null);
-    const [realtimeFeedbacks, setRealtimeFeedbacks] = useState<string[]>([]);
-    const [currentPhase, setCurrentPhase] = useState<string>("");
     const [sessionId, setSessionId] = useState<string | null>(null);
     const [isCheckInOpen, setIsCheckInOpen] = useState(false);
     const [checkIn, setCheckIn] = useState({
@@ -37,78 +35,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const chunksRef = useRef<Blob[]>([]);
     const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const blobRef = useRef<Blob | null>(null);
-    const realtimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
-    const sessionIdRef = useRef<string>("");
 
-    // Real-time feedback frame capture effect
-    useEffect(() => {
-        if (isRecording) {
-            setRealtimeFeedbacks([]);
-            setCurrentPhase("START");
-            sessionIdRef.current = assignmentId || Math.random().toString(36).substring(7);
-
-            const sendFrame = async () => {
-                const video = videoRef.current;
-                if (!video || video.paused || video.ended) return;
-
-                const canvas = document.createElement("canvas");
-                canvas.width = video.videoWidth || 640;
-                canvas.height = video.videoHeight || 360;
-
-                const ctx = canvas.getContext("2d");
-                if (!ctx) return;
-
-                // Draw current frame
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                canvas.toBlob(async (blob) => {
-                    if (!blob) return;
-
-                    const formData = new FormData();
-                    formData.append("frame", blob, "frame.jpg");
-
-                    try {
-                        // If exerciseId is numeric or generic, let's map it or use the configuration key
-                        let exerciseParam = exerciseId;
-                        if (exerciseId === "1") {
-                            exerciseParam = "shoulder_flexion";
-                        }
-                        const url = `http://localhost:8000/trace/realtime/${exerciseParam}?session_id=${sessionIdRef.current}`;
-                        const res = await fetch(url, {
-                            method: "POST",
-                            body: formData,
-                        });
-                        if (res.ok) {
-                            const data = await res.json();
-                            if (data.feedbacks) {
-                                setRealtimeFeedbacks(data.feedbacks);
-                            }
-                            if (data.current_phase) {
-                                setCurrentPhase(data.current_phase);
-                            }
-                        }
-                    } catch (err) {
-                        console.error("Error sending real-time frame:", err);
-                    }
-                }, "image/jpeg", 0.6);
-            };
-
-            // Capture and analyze frame every 750ms
-            realtimeIntervalRef.current = setInterval(sendFrame, 750);
-        } else {
-            if (realtimeIntervalRef.current) {
-                clearInterval(realtimeIntervalRef.current);
-                realtimeIntervalRef.current = null;
-            }
-        }
-
-        return () => {
-            if (realtimeIntervalRef.current) {
-                clearInterval(realtimeIntervalRef.current);
-                realtimeIntervalRef.current = null;
-            }
-        };
-    }, [isRecording, exerciseId, assignmentId]);
 
     // Clean up streams on unmount or close
     useEffect(() => {
@@ -260,11 +187,6 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             if (res.success) {
                 setEvaluationScore(res.score);
                 setSessionId(res.sessionId);
-                try {
-                    await api.updateSessionFeedback(res.sessionId, realtimeFeedbacks);
-                } catch (feedbackErr: any) {
-                    console.warn("Failed to save AI feedback:", feedbackErr);
-                }
                 setIsOpen(false);
                 setIsCheckInOpen(true);
             } else {
@@ -309,7 +231,6 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             confidenceLevel: 10,
             note: "",
         });
-        setRealtimeFeedbacks([]);
     };
 
     const updateCheckInField = (
@@ -500,71 +421,6 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                                 }}
                                             />
                                             REC
-                                        </div>
-                                    )}
-
-                                    {/* Real-time Phase Badge */}
-                                    {isRecording && currentPhase && (
-                                        <div
-                                            style={{
-                                                position: "absolute",
-                                                top: "16px",
-                                                right: "16px",
-                                                backgroundColor: "rgba(15, 23, 42, 0.8)",
-                                                backdropFilter: "blur(4px)",
-                                                padding: "6px 12px",
-                                                borderRadius: "9999px",
-                                                fontSize: "12px",
-                                                fontWeight: 600,
-                                                color: "#10B981",
-                                                border: "1px solid rgba(16, 185, 129, 0.3)",
-                                                zIndex: 10,
-                                            }}
-                                        >
-                                            Phase: {
-                                                currentPhase === "START" ? "Starting Position" :
-                                                currentPhase === "ASCENT" ? "Raising Arms" :
-                                                currentPhase === "PEAK" ? "Hold Position" :
-                                                currentPhase === "DESCENT" ? "Lowering Arms" :
-                                                currentPhase === "UNKNOWN" ? "Detecting alignment..." : currentPhase
-                                            }
-                                        </div>
-                                    )}
-
-                                    {/* Real-time Corrective Feedback Overlay */}
-                                    {isRecording && (
-                                        <div
-                                            style={{
-                                                position: "absolute",
-                                                bottom: "24px",
-                                                left: "50%",
-                                                transform: "translateX(-50%)",
-                                                width: "90%",
-                                                maxWidth: "500px",
-                                                backgroundColor: realtimeFeedbacks.length > 0 ? "rgba(239, 68, 68, 0.9)" : "rgba(16, 185, 129, 0.85)",
-                                                backdropFilter: "blur(6px)",
-                                                padding: "12px 18px",
-                                                borderRadius: "12px",
-                                                color: "#FFF",
-                                                textAlign: "center",
-                                                boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.3)",
-                                                zIndex: 10,
-                                                transition: "all 0.3s ease",
-                                            }}
-                                        >
-                                            {realtimeFeedbacks.length > 0 ? (
-                                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                                    {realtimeFeedbacks.map((fb, idx) => (
-                                                        <div key={idx} style={{ fontSize: "14px", fontWeight: 700 }}>
-                                                            ⚠️ {fb}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div style={{ fontSize: "14px", fontWeight: 700 }}>
-                                                    ✨ Form alignment looks great! Keep it up.
-                                                </div>
-                                            )}
                                         </div>
                                     )}
 

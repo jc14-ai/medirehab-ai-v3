@@ -3,6 +3,7 @@ import careRoutes from "./care.routes";
 import authRoutes from "./auth.routes";
 import exerciseRoutes from "./exercise.routes";
 import userRoutes from "./user.routes";
+import uploadRoutes from "./upload.routes";
 
 const router = Router();
 
@@ -14,5 +15,6 @@ router.use("/auth", authRoutes);
 router.use("/users", userRoutes);
 router.use("/exercises", exerciseRoutes);
 router.use("/care", careRoutes);
+router.use("/upload", uploadRoutes);
 
 export default router;

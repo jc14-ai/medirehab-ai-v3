@@ -2,12 +2,12 @@ import { Router } from "express";
 import { Role } from "@prisma/client";
 import {
     addDoctorComment,
+    getAdminSessions,
     getDoctorPatientSessions,
     getMyNotifications,
     getMySessions,
     markMyNotificationRead,
-    submitCheckIn,
-    updateSessionFeedback
+    submitCheckIn
 } from "../controllers/care.controller";
 import { authMiddleware } from "../middlewares/auth.middleware";
 import { requirePasswordChanged } from "../middlewares/password.middleware";
@@ -31,12 +31,12 @@ router.get(
     getDoctorPatientSessions
 );
 
-router.patch(
-    "/sessions/:sessionId/feedback",
+router.get(
+    "/admin/sessions",
     authMiddleware,
     requirePasswordChanged,
-    requireRole(Role.PATIENT),
-    updateSessionFeedback
+    requireRole(Role.ADMIN),
+    getAdminSessions
 );
 
 router.post(

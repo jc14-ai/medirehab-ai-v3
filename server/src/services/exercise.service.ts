@@ -101,6 +101,28 @@ const ensureActiveExercise = async (exerciseId: string): Promise<void> => {
     }
 };
 
+const ensureExerciseExists = async (exerciseId: string): Promise<void> => {
+    const exercise = await prisma.exercise.findFirst({
+        where: { id: exerciseId },
+        select: { id: true }
+    });
+
+    if (!exercise) {
+        throw new HttpError(404, "Exercise not found.");
+    }
+};
+
+const ensureArchivedExerciseExists = async (exerciseId: string): Promise<void> => {
+    const exercise = await prisma.exercise.findFirst({
+        where: { id: exerciseId, archivedAt: { not: null } },
+        select: { id: true }
+    });
+
+    if (!exercise) {
+        throw new HttpError(409, "Exercise must be archived before it can be deleted permanently.");
+    }
+};
+
 const toImageCreateMany = (input: ValidatedCreateExerciseInput | ValidatedUpdateExerciseInput) => {
     return input.images?.map((image) => ({
         imageName: image.imageName,
@@ -121,12 +143,16 @@ export const createExercise = async (input: ValidatedCreateExerciseInput) => {
     });
 };
 
-export const listExercises = async () => {
+export const listExercises = async (includeArchived = false) => {
     return prisma.exercise.findMany({
-        where: {
-            isActive: true,
-            archivedAt: null
-        },
+        ...(includeArchived
+            ? {}
+            : {
+                where: {
+                    isActive: true,
+                    archivedAt: null
+                }
+            }),
         select: exerciseSelect,
         orderBy: { name: "asc" }
     });
@@ -136,7 +162,7 @@ export const updateExercise = async (
     exerciseId: string,
     input: ValidatedUpdateExerciseInput
 ) => {
-    await ensureActiveExercise(exerciseId);
+    await ensureExerciseExists(exerciseId);
 
     return prisma.$transaction(async (tx) => {
         if (input.images !== undefined) {
@@ -169,6 +195,27 @@ export const archiveExercise = async (exerciseId: string) => {
             archivedAt: new Date()
         },
         select: exerciseSelect
+    });
+};
+
+export const restoreExercise = async (exerciseId: string) => {
+    await ensureArchivedExerciseExists(exerciseId);
+
+    return prisma.exercise.update({
+        where: { id: exerciseId },
+        data: {
+            isActive: true,
+            archivedAt: null
+        },
+        select: exerciseSelect
+    });
+};
+
+export const deleteExercisePermanently = async (exerciseId: string) => {
+    await ensureArchivedExerciseExists(exerciseId);
+
+    return prisma.exercise.delete({
+        where: { id: exerciseId }
     });
 };
 
@@ -399,4 +446,3 @@ export const evaluateExercise = async (
 
     return { score, feedback };
 };
-

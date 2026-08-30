@@ -6,7 +6,6 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TemporaryPasswordDialog } from "@/components/ui/temporary-password-dialog";
 import { DoctorForm } from "@/components/admin/doctor-form";
-import Link from "next/link";
 
 function PlusIcon() {
   return (
@@ -36,11 +35,23 @@ function ArchiveIcon() {
   );
 }
 
-function ToggleIcon({ isActive }: { isActive: boolean }) {
+function TrashIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1" y="5" width="22" height="14" rx="7" ry="7" />
-      <circle cx={isActive ? "16" : "8"} cy="12" r="3" fill={isActive ? "var(--color-primary)" : "currentColor"} />
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </svg>
+  );
+}
+
+function RestoreIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <path d="M3 3v6h6" />
     </svg>
   );
 }
@@ -67,6 +78,12 @@ function buildGeneratedPassword() {
   return `Temp${Math.random().toString(36).slice(2, 8)}!9A`;
 }
 
+function doctorName(doctor?: ApiDoctor | null) {
+  if (!doctor) return "Doctor";
+  const name = [doctor.profile?.firstName, doctor.profile?.lastName].filter(Boolean).join(" ");
+  return name ? `Dr. ${name}` : doctor.email;
+}
+
 export default function DoctorsPage() {
   const [doctors, setDoctors] = useState<ApiDoctor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +95,7 @@ export default function DoctorsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDoctor, setEditingDoctor] = useState<ApiDoctor | undefined>(undefined);
   const [formLoading, setFormLoading] = useState(false);
+  const [viewingDoctor, setViewingDoctor] = useState<ApiDoctor | null>(null);
 
   const [tempPassword, setTempPassword] = useState("");
   const [isTempPasswordOpen, setIsTempPasswordOpen] = useState(false);
@@ -138,28 +156,6 @@ export default function DoctorsPage() {
     }
   };
 
-  const handleToggleStatus = (doctor: ApiDoctor) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: `${doctor.isActive ? "Deactivate" : "Activate"} Doctor`,
-      message: `Are you sure you want to ${doctor.isActive ? "deactivate" : "activate"} Dr. ${doctor.profile?.lastName}?`,
-      isDestructive: doctor.isActive,
-      isLoading: false,
-      action: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
-        try {
-          await api.updateDoctorStatus(doctor.id, !doctor.isActive);
-          await loadDoctors();
-        } catch (err) {
-          if (err instanceof ApiError) alert(err.message);
-          else alert("Operation failed");
-        } finally {
-          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
-        }
-      },
-    });
-  };
-
   const handleArchive = (doctor: ApiDoctor) => {
     setConfirmDialog({
       isOpen: true,
@@ -180,6 +176,54 @@ export default function DoctorsPage() {
         }
       },
     });
+  };
+
+  const handlePermanentDelete = (doctor: ApiDoctor) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Doctor Permanently",
+      message: `Delete Dr. ${doctor.profile?.lastName || doctor.email} permanently? This will remove the account and related doctor data from the database.`,
+      isDestructive: true,
+      isLoading: false,
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await api.permanentlyDeleteDoctor(doctor.id);
+          await loadDoctors();
+        } catch (err) {
+          if (err instanceof ApiError) alert(err.message);
+          else alert("Operation failed");
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      },
+    });
+  };
+
+  const handleRestore = (doctor: ApiDoctor) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Restore Doctor",
+      message: `Restore Dr. ${doctor.profile?.lastName || doctor.email} to active use?`,
+      isDestructive: false,
+      isLoading: false,
+      action: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await api.updateDoctorStatus(doctor.id, true);
+          await loadDoctors();
+        } catch (err) {
+          if (err instanceof ApiError) alert(err.message);
+          else alert("Operation failed");
+        } finally {
+          setConfirmDialog((prev) => ({ ...prev, isOpen: false, isLoading: false }));
+        }
+      },
+    });
+  };
+
+  const openDoctorPersona = (doctor: ApiDoctor) => {
+    setViewingDoctor(doctor);
   };
 
   const handleResetPassword = (doctor: ApiDoctor) => {
@@ -336,9 +380,13 @@ export default function DoctorsPage() {
                   filteredDoctors.map((doctor) => (
                     <tr key={doctor.id} style={{ borderBottom: "1px solid var(--color-page-bg)", transition: "background-color 0.15s ease" }} onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "var(--color-primary-soft)"} onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "transparent"}>
                       <td style={{ padding: "12px 16px", fontWeight: 500, color: "var(--color-text-primary)" }}>
-                        <Link href={`/admin/doctors/${doctor.id}`} style={{ color: "var(--color-primary)", textDecoration: "none" }}>
+                        <button
+                          type="button"
+                          onClick={() => openDoctorPersona(doctor)}
+                          style={{ color: "var(--color-primary)", textDecoration: "none", background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: 600, textAlign: "left" }}
+                        >
                           {doctor.profile ? `Dr. ${doctor.profile.firstName} ${doctor.profile.lastName}` : "Unknown"}
-                        </Link>
+                        </button>
                       </td>
                       <td style={{ padding: "12px 16px", color: "var(--color-text-secondary)", fontSize: "14px" }}>
                         {doctor.email}
@@ -365,13 +413,6 @@ export default function DoctorsPage() {
                           >
                             <KeyIcon />
                           </button>
-                          <button
-                            title={doctor.isActive ? "Deactivate" : "Activate"}
-                            style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", padding: "4px" }}
-                            onClick={() => handleToggleStatus(doctor)}
-                          >
-                            <ToggleIcon isActive={doctor.isActive} />
-                          </button>
                           {!doctor.archivedAt && (
                             <button
                               title="Archive"
@@ -379,6 +420,24 @@ export default function DoctorsPage() {
                               onClick={() => handleArchive(doctor)}
                             >
                               <ArchiveIcon />
+                            </button>
+                          )}
+                          {doctor.archivedAt && (
+                            <button
+                              title="Restore"
+                              style={{ background: "none", border: "none", color: "var(--color-text-secondary)", cursor: "pointer", padding: "4px" }}
+                              onClick={() => handleRestore(doctor)}
+                            >
+                              <RestoreIcon />
+                            </button>
+                          )}
+                          {doctor.archivedAt && (
+                            <button
+                              title="Delete permanently"
+                              style={{ background: "none", border: "none", color: "var(--color-danger)", cursor: "pointer", padding: "4px" }}
+                              onClick={() => handlePermanentDelete(doctor)}
+                            >
+                              <TrashIcon />
                             </button>
                           )}
                         </div>
@@ -415,6 +474,69 @@ export default function DoctorsPage() {
         password={tempPassword}
         onClose={() => setIsTempPasswordOpen(false)}
       />
+
+      {viewingDoctor && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: "20px",
+          }}
+          onClick={() => setViewingDoctor(null)}
+        >
+          <div
+            className="card animate-slide-up"
+            style={{ width: "100%", maxWidth: "720px", padding: "24px", maxHeight: "90vh", overflowY: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "20px" }}>
+              <div>
+                <h2 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 6px 0", color: "var(--color-text-primary)" }}>
+                  {doctorName(viewingDoctor)}
+                </h2>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+                  <StatusBadge isActive={viewingDoctor.isActive} archivedAt={viewingDoctor.archivedAt} />
+                  <span style={{ color: "var(--color-text-muted)", fontSize: "14px" }}>{viewingDoctor.email}</span>
+                </div>
+              </div>
+              <button
+                className="btn btn-secondary"
+                style={{ minWidth: "auto", height: "36px", padding: "0 12px" }}
+                onClick={() => setViewingDoctor(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            <h3 style={{ fontSize: "16px", fontWeight: 600, margin: "0 0 16px 0", color: "var(--color-text-primary)" }}>
+              Persona Information
+            </h3>
+
+            <div className="doctor-form-grid">
+              <DetailField label="First Name" value={viewingDoctor.profile?.firstName} />
+              <DetailField label="Last Name" value={viewingDoctor.profile?.lastName} />
+              <DetailField label="Specialization" value={viewingDoctor.profile?.specialization} />
+              <DetailField label="License Number" value={viewingDoctor.profile?.licenseNumber} />
+              <DetailField label="Contact Number" value={viewingDoctor.profile?.contactNumber} />
+              <DetailField label="Clinic Schedule" value={viewingDoctor.profile?.clinicSchedule} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailField({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div>
+      <div style={{ fontSize: "12px", fontWeight: 700, textTransform: "uppercase", color: "var(--color-text-muted)", marginBottom: "4px" }}>{label}</div>
+      <div style={{ color: "var(--color-text-primary)", fontWeight: 500 }}>{value || "-"}</div>
     </div>
   );
 }

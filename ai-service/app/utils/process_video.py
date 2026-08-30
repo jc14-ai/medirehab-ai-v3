@@ -1,8 +1,13 @@
+import os
+os.environ["OPENCV_FFMPEG_LOGLEVEL"] = "-8"
+
 from ultralytics import YOLO
 import cv2
 import csv
-import os
+import torch
 
+# Use MPS (Metal Performance Shaders) on Apple Silicon if available to accelerate inference
+device = "mps" if torch.backends.mps.is_available() else "cpu"
 model = YOLO("yolo26s-pose.pt")
 
 BODY_PARTS = [
@@ -44,23 +49,25 @@ def process_video_to_csv(video_path, output_csv_path):
         writer.writerow(header)
         
         frame_id = 0
+        frame_stride = 3  # Process every 3rd frame to speed up processing by 3x on macOS
         while True:
             ret, frame = cap.read()
             if not ret:
                 break
                 
-            results = model(frame, verbose=False)
-            keypoints = results[0].keypoints
-            
-            if keypoints is not None and keypoints.xy is not None and len(keypoints.xy) > 0:
-                xy = keypoints.xy[0]
+            if frame_id % frame_stride == 0:
+                results = model(frame, verbose=False, device=device)
+                keypoints = results[0].keypoints
                 
-                row = [frame_id]
-                for idx in keep_indices:
-                    x = xy[idx][0].item() / width
-                    y = xy[idx][1].item() / height
-                    row += [x, y]
-                writer.writerow(row)
+                if keypoints is not None and keypoints.xy is not None and len(keypoints.xy) > 0:
+                    xy = keypoints.xy[0]
+                    
+                    row = [frame_id]
+                    for idx in keep_indices:
+                        x = xy[idx][0].item() / width
+                        y = xy[idx][1].item() / height
+                        row += [x, y]
+                    writer.writerow(row)
                 
             frame_id += 1
             

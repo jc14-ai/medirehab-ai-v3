@@ -261,6 +261,12 @@ export const api = {
     });
   },
 
+  permanentlyDeleteDoctor(userId: string) {
+    return request<ApiResponse>(`/users/doctors/${userId}/trash`, {
+      method: "DELETE",
+    });
+  },
+
   // --- Admin: Patients ---
   getAdminPatients() {
     return request<{ success: boolean; patients: ApiPatient[] }>("/users/admin/patients").then((res) => ({
@@ -301,6 +307,18 @@ export const api = {
     });
   },
 
+  restoreExercise(exerciseId: string) {
+    return request<{ success: boolean; exercise: ApiExercise }>(`/exercises/${exerciseId}/restore`, {
+      method: "PATCH",
+    });
+  },
+
+  permanentlyDeleteExercise(exerciseId: string) {
+    return request<ApiResponse>(`/exercises/${exerciseId}/trash`, {
+      method: "DELETE",
+    });
+  },
+
   // --- Profile ---
   getProfile() {
     return request<{ success: boolean; user: ApiUser & { profile?: DoctorProfile | PatientProfile } }>("/users/me/profile");
@@ -319,6 +337,10 @@ export const api = {
       ...res,
       patients: res.patients.map(normalizePatient),
     }));
+  },
+
+  getAdminCareSessions() {
+    return request<{ success: boolean; sessions: CareSession[] }>("/care/admin/sessions");
   },
 
   getPatient(userId: string) {
@@ -358,6 +380,12 @@ export const api = {
 
   deletePatient(userId: string) {
     return request<ApiResponse>(`/users/patients/${userId}`, {
+      method: "DELETE",
+    });
+  },
+
+  permanentlyDeletePatient(userId: string) {
+    return request<ApiResponse>(`/users/patients/${userId}/trash`, {
       method: "DELETE",
     });
   },
@@ -408,12 +436,6 @@ export const api = {
     return request<{ success: boolean; sessions: CareSession[] }>(`/care/patients/${patientUserId}/sessions`);
   },
 
-  updateSessionFeedback(sessionId: string, aiFeedback: string[]) {
-    return request<{ success: boolean; session: CareSession }>(`/care/sessions/${sessionId}/feedback`, {
-      method: "PATCH",
-      body: JSON.stringify({ aiFeedback }),
-    });
-  },
 
   submitCheckIn(sessionId: string, data: { painLevel: number; difficultyLevel: number; confidenceLevel: number; note?: string }) {
     return request<{ success: boolean; session: CareSession }>(`/care/sessions/${sessionId}/check-in`, {
