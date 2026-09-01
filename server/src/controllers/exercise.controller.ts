@@ -12,6 +12,7 @@ import {
     evaluateExercise
 } from "../services/exercise.service";
 import { recordExerciseSession } from "../services/care.service";
+import { createLiveCoachingMessage } from "../services/live-coaching.service";
 import { HttpError } from "../utils/httpError";
 import {
     validateAssignExerciseInput,
@@ -20,6 +21,7 @@ import {
     validateExerciseIdParam,
     validateUpdateExerciseInput
 } from "../utils/exerciseValidation";
+import { validateLiveCoachingInput } from "../utils/liveCoachingValidation";
 import { validateUserIdParam } from "../utils/userValidation";
 
 const MAX_EXERCISE_RECORDING_BYTES = 50 * 1024 * 1024;
@@ -68,6 +70,28 @@ export const getExercises = async (_req: Request, res: Response): Promise<void> 
         });
     } catch (error) {
         handleExerciseError(error, res, "Unable to load exercises.");
+    }
+};
+
+export const createLiveCoaching = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const patientUserId = getAuthenticatedUserId(req);
+        const exerciseId = validateExerciseIdParam(req.params.exerciseId);
+        const assignmentId = validateAssignmentIdParam(req.params.assignmentId);
+        const input = validateLiveCoachingInput(req.body);
+        const coaching = await createLiveCoachingMessage(
+            patientUserId,
+            exerciseId,
+            assignmentId,
+            input.event
+        );
+
+        res.status(200).json({ success: true, ...coaching });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to create live coaching.");
     }
 };
 
