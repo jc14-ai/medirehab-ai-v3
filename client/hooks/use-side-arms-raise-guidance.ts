@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import {
     INITIAL_SIDE_ARMS_RAISE_STATE,
     updateSideArmsRaiseGuidance,
+    type SideArmsRaiseGuidanceEvent,
+    type SideArmsRaiseGuidanceIssue,
     type SideArmsRaiseGuidanceState,
 } from "@/lib/pose/side-arms-raise-guidance";
 import {
@@ -28,6 +30,9 @@ interface LiveGuidanceView {
     hasReliablePose: boolean;
     justCompletedRepetition: boolean;
     keyPoints: ExerciseKeyPointVisibility[];
+    activeIssues: SideArmsRaiseGuidanceIssue[];
+    resolvedIssues: SideArmsRaiseGuidanceIssue[];
+    recentGuidanceEvents: SideArmsRaiseGuidanceEvent[];
 }
 
 const DISABLED_VIEW: LiveGuidanceView = {
@@ -37,6 +42,9 @@ const DISABLED_VIEW: LiveGuidanceView = {
     hasReliablePose: false,
     justCompletedRepetition: false,
     keyPoints: [],
+    activeIssues: [],
+    resolvedIssues: [],
+    recentGuidanceEvents: [],
 };
 
 const LOADING_VIEW: LiveGuidanceView = {
@@ -46,6 +54,9 @@ const LOADING_VIEW: LiveGuidanceView = {
     hasReliablePose: false,
     justCompletedRepetition: false,
     keyPoints: getRequiredExerciseKeyPointVisibility("Side Arms Raise", null),
+    activeIssues: [],
+    resolvedIssues: [],
+    recentGuidanceEvents: [],
 };
 
 export function useSideArmsRaiseGuidance(
@@ -85,6 +96,9 @@ export function useSideArmsRaiseGuidance(
                 hasReliablePose: false,
                 justCompletedRepetition: false,
                 keyPoints: getRequiredExerciseKeyPointVisibility("Side Arms Raise", null),
+                activeIssues: [],
+                resolvedIssues: [],
+                recentGuidanceEvents: guidanceStateRef.current.recentGuidanceEvents,
             });
         };
 
@@ -100,6 +114,9 @@ export function useSideArmsRaiseGuidance(
                     hasReliablePose: false,
                     justCompletedRepetition: false,
                     keyPoints: getRequiredExerciseKeyPointVisibility("Side Arms Raise", null),
+                    activeIssues: [],
+                    resolvedIssues: [],
+                    recentGuidanceEvents: guidanceStateRef.current.recentGuidanceEvents,
                 });
                 return;
             }
@@ -122,6 +139,9 @@ export function useSideArmsRaiseGuidance(
                 hasReliablePose: snapshot.hasReliablePose,
                 justCompletedRepetition: snapshot.justCompletedRepetition,
                 keyPoints: snapshot.keyPoints,
+                activeIssues: snapshot.activeIssues,
+                resolvedIssues: snapshot.resolvedIssues,
+                recentGuidanceEvents: snapshot.recentGuidanceEvents,
             });
         };
 
