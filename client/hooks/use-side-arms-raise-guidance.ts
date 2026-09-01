@@ -12,6 +12,11 @@ import {
     getRequiredExerciseKeyPointVisibility,
     type ExerciseKeyPointVisibility,
 } from "@/lib/pose/exercise-key-points";
+import {
+    INITIAL_GUIDANCE_DISPLAY_STATE,
+    stabilizeGuidanceMessage,
+    type GuidanceDisplayState,
+} from "@/lib/pose/live-guidance-stabilizer";
 import type {
     PoseWorkerRequest,
     PoseWorkerResponse,
@@ -65,6 +70,7 @@ export function useSideArmsRaiseGuidance(
 ): LiveGuidanceView {
     const [view, setView] = useState<LiveGuidanceView>(DISABLED_VIEW);
     const guidanceStateRef = useRef<SideArmsRaiseGuidanceState>(INITIAL_SIDE_ARMS_RAISE_STATE);
+    const guidanceDisplayRef = useRef<GuidanceDisplayState>(INITIAL_GUIDANCE_DISPLAY_STATE);
 
     useEffect(() => {
         if (!enabled) {
@@ -78,6 +84,7 @@ export function useSideArmsRaiseGuidance(
         let animationFrameId = 0;
 
         guidanceStateRef.current = INITIAL_SIDE_ARMS_RAISE_STATE;
+        guidanceDisplayRef.current = INITIAL_GUIDANCE_DISPLAY_STATE;
         const resetViewFrameId = window.requestAnimationFrame(() => setView(LOADING_VIEW));
 
         const worker = new Worker(
@@ -107,9 +114,16 @@ export function useSideArmsRaiseGuidance(
 
             if (event.data.type === "ready") {
                 workerReady = true;
+                const message = "Move fully into the frame so both shoulders and elbows are visible.";
+                guidanceDisplayRef.current = stabilizeGuidanceMessage(
+                    guidanceDisplayRef.current,
+                    message,
+                    performance.now(),
+                    true,
+                );
                 setView({
                     status: "ready",
-                    message: "Move fully into the frame so both shoulders and elbows are visible.",
+                    message,
                     repetitions: 0,
                     hasReliablePose: false,
                     justCompletedRepetition: false,
@@ -132,9 +146,15 @@ export function useSideArmsRaiseGuidance(
                 event.data.landmarks,
             );
             guidanceStateRef.current = snapshot.state;
+            guidanceDisplayRef.current = stabilizeGuidanceMessage(
+                guidanceDisplayRef.current,
+                snapshot.message,
+                performance.now(),
+                !snapshot.hasReliablePose || snapshot.justCompletedRepetition,
+            );
             setView({
                 status: "ready",
-                message: snapshot.message,
+                message: guidanceDisplayRef.current.displayedMessage,
                 repetitions: snapshot.state.repetitions,
                 hasReliablePose: snapshot.hasReliablePose,
                 justCompletedRepetition: snapshot.justCompletedRepetition,
