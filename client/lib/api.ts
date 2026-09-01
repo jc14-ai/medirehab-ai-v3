@@ -399,6 +399,21 @@ export const api = {
     });
   },
 
+  requestLiveCoaching(
+    exerciseId: string,
+    assignmentId: string,
+    event: "issue_resolved" | "repetition_completed",
+  ) {
+    return request<{
+      success: boolean;
+      message: string;
+      source: "ollama" | "fallback";
+    }>(`/exercises/patients/exercises/${exerciseId}/assignments/${assignmentId}/live-coaching`, {
+      method: "POST",
+      body: JSON.stringify({ event }),
+    });
+  },
+
   // --- Care Timeline & Notifications ---
   getMySessions() {
     return request<{ success: boolean; sessions: CareSession[] }>("/care/me/sessions");

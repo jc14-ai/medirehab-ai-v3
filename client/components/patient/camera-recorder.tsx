@@ -14,6 +14,7 @@ interface CameraRecorderProps {
 }
 
 const MAX_RECORDING_SECONDS = 20;
+const LIVE_COACHING_COOLDOWN_MS = 7_000;
 const GUIDANCE_MESSAGES_TO_SKIP = new Set([
     "Preparing live guidance...",
     "Preparing live guidance…",
@@ -38,6 +39,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     });
     const [isSubmittingCheckIn, setIsSubmittingCheckIn] = useState(false);
     const [checkInMessage, setCheckInMessage] = useState<string | null>(null);
+    const [liveCoachingMessage, setLiveCoachingMessage] = useState<string | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -46,6 +48,9 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
     const recordingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const blobRef = useRef<Blob | null>(null);
     const liveGuidanceFeedbackRef = useRef<string[]>([]);
+    const isRecordingRef = useRef(false);
+    const lastLiveCoachingAtRef = useRef(0);
+    const liveCoachingRequestIdRef = useRef(0);
     const liveGuidanceEnabled =
         isOpen &&
         Boolean(stream) &&
@@ -55,6 +60,10 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         liveGuidanceEnabled,
         videoRef,
     );
+
+    useEffect(() => {
+        isRecordingRef.current = isRecording;
+    }, [isRecording]);
 
     useEffect(() => {
         if (
@@ -73,6 +82,59 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             ];
         }
     }, [isRecording, liveGuidance.message, liveGuidance.status]);
+
+    useEffect(() => {
+        if (!isRecording || !assignmentId || liveGuidance.status !== "ready") {
+            return;
+        }
+
+        const event = liveGuidance.justCompletedRepetition
+            ? "repetition_completed"
+            : liveGuidance.resolvedIssues.length > 0
+              ? "issue_resolved"
+              : null;
+        const now = Date.now();
+
+        if (!event || now - lastLiveCoachingAtRef.current < LIVE_COACHING_COOLDOWN_MS) {
+            return;
+        }
+
+        lastLiveCoachingAtRef.current = now;
+        const requestId = liveCoachingRequestIdRef.current + 1;
+        liveCoachingRequestIdRef.current = requestId;
+
+        api.requestLiveCoaching(exerciseId, assignmentId, event)
+            .then((response) => {
+                if (
+                    liveCoachingRequestIdRef.current !== requestId
+                    || !isRecordingRef.current
+                ) {
+                    return;
+                }
+
+                setLiveCoachingMessage(response.message);
+                if (!liveGuidanceFeedbackRef.current.includes(response.message)) {
+                    liveGuidanceFeedbackRef.current = [
+                        ...liveGuidanceFeedbackRef.current,
+                        response.message,
+                    ];
+                }
+                speakLiveCoaching(response.message);
+            })
+            .catch((coachingError: unknown) => {
+                console.warn(
+                    "Failed to load live coaching:",
+                    getErrorMessage(coachingError, "Unknown error"),
+                );
+            });
+    }, [
+        assignmentId,
+        exerciseId,
+        isRecording,
+        liveGuidance.justCompletedRepetition,
+        liveGuidance.resolvedIssues,
+        liveGuidance.status,
+    ]);
 
     // Clean up streams on unmount or close
     useEffect(() => {
@@ -155,6 +217,10 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         });
         setIsSubmittingCheckIn(false);
         setCheckInMessage(null);
+        setLiveCoachingMessage(null);
+        liveCoachingRequestIdRef.current += 1;
+        lastLiveCoachingAtRef.current = 0;
+        stopLiveCoachingPlayback();
         liveGuidanceFeedbackRef.current = [];
         blobRef.current = null;
     };
@@ -180,6 +246,9 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
         if (!stream) return;
         chunksRef.current = [];
         liveGuidanceFeedbackRef.current = [];
+        setLiveCoachingMessage(null);
+        liveCoachingRequestIdRef.current += 1;
+        lastLiveCoachingAtRef.current = 0;
 
         try {
             const options = { mimeType: "video/webm;codecs=vp9" };
@@ -218,6 +287,7 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             setIsRecording(true);
             recordingTimeoutRef.current = setTimeout(() => {
                 if (recorder.state === "recording") {
+                    liveCoachingRequestIdRef.current += 1;
                     recorder.stop();
                     setIsRecording(false);
                 }
@@ -234,6 +304,8 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
             recordingTimeoutRef.current = null;
         }
         if (mediaRecorderRef.current && isRecording) {
+            liveCoachingRequestIdRef.current += 1;
+            stopLiveCoachingPlayback();
             mediaRecorderRef.current.stop();
             setIsRecording(false);
         }
@@ -539,6 +611,30 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
                                                 Live guidance
                                             </div>
                                             <ExerciseKeyPointFigure points={liveGuidance.keyPoints} />
+                                            {liveCoachingMessage && (
+                                                <div
+                                                    aria-live="polite"
+                                                    style={{
+                                                        position: "absolute",
+                                                        left: "50%",
+                                                        bottom: "92px",
+                                                        transform: "translateX(-50%)",
+                                                        width: "min(90%, 540px)",
+                                                        padding: "9px 13px",
+                                                        borderRadius: "10px",
+                                                        backgroundColor: "rgba(13, 148, 136, 0.92)",
+                                                        color: "#FFF",
+                                                        textAlign: "center",
+                                                        fontSize: "13px",
+                                                        fontWeight: 600,
+                                                        lineHeight: 1.4,
+                                                        zIndex: 10,
+                                                        boxShadow: "0 8px 24px rgba(0, 0, 0, 0.22)",
+                                                    }}
+                                                >
+                                                    {liveCoachingMessage}
+                                                </div>
+                                            )}
                                             <div
                                                 aria-live="polite"
                                                 style={{
@@ -889,4 +985,17 @@ export function CameraRecorder({ exerciseName = "Exercise", exerciseId, assignme
 
 function getErrorMessage(error: unknown, fallback: string): string {
     return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function speakLiveCoaching(message: string): void {
+    if (!("speechSynthesis" in window)) return;
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(message));
+}
+
+function stopLiveCoachingPlayback(): void {
+    if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+    }
 }
