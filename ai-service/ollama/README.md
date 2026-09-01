@@ -22,9 +22,9 @@ ollama create coach-qwen:latest -f ai-service/ollama/Modelfile
 The resulting `coach-qwen:latest` model is based on Qwen 3.5 0.8B and uses
 the prompt and generation settings defined in `Modelfile`.
 
-## Configure The Server
+## Configure The AI Service
 
-Add these values to `server/.env`:
+Add these values to `ai-service/.env`:
 
 ```dotenv
 OLLAMA_BASE_URL=http://127.0.0.1:11434
@@ -34,7 +34,9 @@ OLLAMA_KEEP_ALIVE=10m
 ```
 
 `OLLAMA_KEEP_ALIVE` keeps the small model loaded between coaching requests to
-reduce response delay. `server/.env.example` contains the same variable names.
+reduce response delay. `ai-service/.env.example` contains the same variable
+names. The Node server sends verified coaching events to this AI service, which
+then calls Ollama.
 
 ## Verify Locally
 
