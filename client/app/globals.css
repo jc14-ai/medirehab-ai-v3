@@ -315,6 +315,22 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+.get-started-logo,
+.get-started-heading,
+.get-started-card {
+  opacity: 0;
+  transform: translateY(18px);
+  animation: get-started-reveal 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.get-started-heading { animation-delay: 120ms; }
+.get-started-card:nth-child(1) { animation-delay: 240ms; }
+.get-started-card:nth-child(2) { animation-delay: 360ms; }
+
+@keyframes get-started-reveal {
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .ambient-sketch {
@@ -322,7 +338,10 @@ body {
     stroke-dashoffset: 0;
   }
   .reveal,
-  .hero-reveal {
+  .hero-reveal,
+  .get-started-logo,
+  .get-started-heading,
+  .get-started-card {
     opacity: 1;
     transform: none;
     animation: none;
