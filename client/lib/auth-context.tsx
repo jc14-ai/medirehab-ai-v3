@@ -31,7 +31,7 @@ const ROLE_DASHBOARDS: Record<UserRole, string> = {
 };
 
 /** Public paths that don't require auth */
-const PUBLIC_PATHS = ["/", "/login/doctor", "/login/patient", "/login/admin"];
+const PUBLIC_PATHS = ["/", "/get-started", "/login/doctor", "/login/patient", "/login/admin"];
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<ApiUser | null>(null);
