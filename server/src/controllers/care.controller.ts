@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
     addDoctorCommentToSession,
     listNotificationsForUser,
+    listSessionsForAdmin,
     listSessionsForDoctorPatient,
     listSessionsForPatient,
     markNotificationRead,
@@ -80,6 +81,19 @@ export const getDoctorPatientSessions = async (
     }
 };
 
+export const getAdminSessions = async (_req: Request, res: Response): Promise<void> => {
+    try {
+        const sessions = await listSessionsForAdmin();
+
+        res.status(200).json({
+            success: true,
+            sessions
+        });
+    } catch (error) {
+        handleCareError(error, res, "Unable to load admin sessions.");
+    }
+};
+
 export const updateSessionFeedback = async (
     req: Request,
     res: Response
@@ -88,11 +102,7 @@ export const updateSessionFeedback = async (
         const user = getAuthenticatedUser(req);
         const sessionId = validateSessionIdParam(req.params.sessionId);
         const input = validateSessionUpdateInput(req.body);
-        const session = await updateSessionAiFeedback(
-            user.userId,
-            sessionId,
-            input
-        );
+        const session = await updateSessionAiFeedback(user.userId, sessionId, input);
 
         res.status(200).json({
             success: true,
@@ -103,6 +113,8 @@ export const updateSessionFeedback = async (
         handleCareError(error, res, "Unable to update session.");
     }
 };
+
+
 
 export const submitCheckIn = async (
     req: Request,

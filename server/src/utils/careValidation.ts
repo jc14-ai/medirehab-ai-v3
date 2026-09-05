@@ -12,6 +12,7 @@ export type ValidatedSessionUpdateInput = {
     aiFeedback?: string[];
 };
 
+
 export type ValidatedCommentInput = {
     body: string;
 };
@@ -45,13 +46,15 @@ const validateFeedbackArray = (value: unknown): string[] => {
         throw new HttpError(400, "AI feedback must be an array.");
     }
 
-    return value.map((item, index) => {
-        if (typeof item !== "string") {
-            throw new HttpError(400, `AI feedback item ${index + 1} must be a string.`);
-        }
+    return value
+        .map((item, index) => {
+            if (typeof item !== "string") {
+                throw new HttpError(400, `AI feedback item ${index + 1} must be a string.`);
+            }
 
-        return item.trim();
-    }).filter(Boolean);
+            return item.trim();
+        })
+        .filter(Boolean);
 };
 
 export const validateCheckInInput = (

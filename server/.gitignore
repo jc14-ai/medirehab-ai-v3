@@ -1,6 +1,7 @@
 .env
 node_modules
 /src/generated/prisma
+uploads
 
 /src/generated/prisma
 dist

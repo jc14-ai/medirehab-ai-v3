@@ -112,8 +112,60 @@ export function ExerciseForm({
               <div style={{ fontSize: "13px", color: "var(--color-text-muted)" }}>No images added.</div>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {formData.images.map((img, i) => (
-                <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+              {formData.images.map((img, i) => {
+                const uploadFile = async (file: File) => {
+                  handleImageChange(i, "filepath", "Uploading...");
+
+                  const formDataObj = new FormData();
+                  formDataObj.append("image", file);
+
+                  try {
+                    const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+                    const res = await fetch(`${apiBase}/upload`, {
+                      method: "POST",
+                      body: formDataObj,
+                    });
+                    const data = await res.json();
+                    if (data.success && data.filepath) {
+                      handleImageChange(i, "filepath", data.filepath);
+                    } else {
+                      handleImageChange(i, "filepath", "");
+                      alert(data.message || "Upload failed.");
+                    }
+                  } catch (err) {
+                    handleImageChange(i, "filepath", "");
+                    alert("Upload failed. Make sure backend is running.");
+                  }
+                };
+
+                return (
+                  <div key={i} style={{ display: "flex", gap: "12px", alignItems: "center", border: "1px solid var(--color-border)", padding: "12px", borderRadius: "var(--radius-md)", backgroundColor: "var(--color-page-bg)" }}>
+                  {img.filepath && !img.filepath.startsWith("Uploading") ? (
+                    <div style={{ width: "64px", height: "64px", borderRadius: "var(--radius-sm)", overflow: "hidden", border: "1px solid var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "white", flexShrink: 0 }}>
+                      <img
+                        src={img.filepath}
+                        alt={img.imageName || "Preview"}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                          const par = e.currentTarget.parentElement;
+                          if (par) {
+                            const fallback = par.querySelector(".preview-fallback");
+                            if (fallback) (fallback as HTMLElement).style.display = "block";
+                          }
+                        }}
+                      />
+                      <span className="preview-fallback" style={{ display: "none", fontSize: "10px", color: "var(--color-text-muted)", textAlign: "center" }}>Broken URL</span>
+                    </div>
+                  ) : img.filepath?.startsWith("Uploading") ? (
+                    <div style={{ width: "64px", height: "64px", borderRadius: "var(--radius-sm)", border: "1px dashed var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <div className="spinner" style={{ width: "16px", height: "16px" }} />
+                    </div>
+                  ) : (
+                    <div style={{ width: "64px", height: "64px", borderRadius: "var(--radius-sm)", border: "1px dashed var(--color-border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--color-text-muted)", fontSize: "10px", flexShrink: 0, textAlign: "center" }}>
+                      No URL
+                    </div>
+                  )}
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px" }}>
                     <input
                       type="text"
@@ -123,20 +175,72 @@ export function ExerciseForm({
                       onChange={(e) => handleImageChange(i, "imageName", e.target.value)}
                       required
                     />
-                    <input
-                      type="text"
-                      className="input"
-                      placeholder="Filepath (e.g. /exercises/squat.png)"
-                      value={img.filepath}
-                      onChange={(e) => handleImageChange(i, "filepath", e.target.value)}
-                      required
-                    />
+                    {img.filepath && !img.filepath.startsWith("Uploading") ? (
+                      <div style={{ fontSize: "11px", color: "var(--color-text-secondary)", wordBreak: "break-all", maxWidth: "240px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {img.filepath}
+                      </div>
+                    ) : null}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <label style={{ fontSize: "11px", color: "var(--color-text-muted)", fontWeight: 500, marginBottom: "4px" }}>
+                        {img.filepath?.startsWith("Uploading") ? "Uploading..." : img.filepath ? "Change image file:" : "Upload image file:"}
+                      </label>
+                      <div
+                        style={{
+                          border: "2px dashed var(--color-border)",
+                          borderRadius: "var(--radius-md)",
+                          padding: "16px",
+                          textAlign: "center",
+                          cursor: "pointer",
+                          backgroundColor: "var(--color-page-bg)",
+                          transition: "all 0.2s ease",
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.style.borderColor = "var(--color-primary)";
+                          e.currentTarget.style.backgroundColor = "var(--color-primary-soft)";
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.style.borderColor = "var(--color-border)";
+                          e.currentTarget.style.backgroundColor = "var(--color-page-bg)";
+                        }}
+                        onDrop={async (e) => {
+                          e.preventDefault();
+                          e.currentTarget.style.borderColor = "var(--color-border)";
+                          e.currentTarget.style.backgroundColor = "var(--color-page-bg)";
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) {
+                            await uploadFile(file);
+                          }
+                        }}
+                        onClick={() => {
+                          const fileInput = document.getElementById(`file-input-${i}`);
+                          if (fileInput) fileInput.click();
+                        }}
+                      >
+                        <span style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
+                          {img.filepath?.startsWith("Uploading") ? "Uploading..." : "Drag & drop image here, or click to upload"}
+                        </span>
+                        <input
+                          id={`file-input-${i}`}
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              await uploadFile(file);
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <button type="button" className="btn btn-danger" style={{ padding: "0 8px" }} onClick={() => handleRemoveImage(i)}>
+                  <button type="button" className="btn btn-danger" style={{ height: "36px", padding: "0 12px", display: "flex", alignItems: "center", justifyContent: "center" }} onClick={() => handleRemoveImage(i)}>
                     X
                   </button>
                 </div>
-              ))}
+              ); })}
             </div>
           </div>
 

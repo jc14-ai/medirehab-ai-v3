@@ -1,13 +1,16 @@
+import { Role } from "@prisma/client";
 import { Request, Response } from "express";
 import {
     archiveExercise,
     archivePatientExerciseAssignment,
     assignExerciseToPatient,
+    deleteExercisePermanently,
     createExercise,
     listAssignedExercisesForDoctorPatient,
     listAssignedExercisesForPatient,
     listAvailableExercisesForPatient,
     listExercises,
+    restoreExercise,
     updateExercise,
     evaluateExercise
 } from "../services/exercise.service";
@@ -60,9 +63,10 @@ const handleExerciseError = (
     });
 };
 
-export const getExercises = async (_req: Request, res: Response): Promise<void> => {
+export const getExercises = async (req: Request, res: Response): Promise<void> => {
     try {
-        const exercises = await listExercises();
+        const includeArchived = req.user?.role === Role.ADMIN;
+        const exercises = await listExercises(includeArchived);
 
         res.status(200).json({
             success: true,
@@ -147,6 +151,41 @@ export const archiveExerciseCatalogItem = async (
         });
     } catch (error) {
         handleExerciseError(error, res, "Unable to archive exercise.");
+    }
+};
+
+export const restoreExerciseCatalogItem = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const exerciseId = validateExerciseIdParam(req.params.exerciseId);
+        const exercise = await restoreExercise(exerciseId);
+
+        res.status(200).json({
+            success: true,
+            message: "Exercise restored successfully.",
+            exercise
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to restore exercise.");
+    }
+};
+
+export const deleteExerciseCatalogItemPermanently = async (
+    req: Request,
+    res: Response
+): Promise<void> => {
+    try {
+        const exerciseId = validateExerciseIdParam(req.params.exerciseId);
+        await deleteExercisePermanently(exerciseId);
+
+        res.status(200).json({
+            success: true,
+            message: "Exercise permanently deleted successfully."
+        });
+    } catch (error) {
+        handleExerciseError(error, res, "Unable to permanently delete exercise.");
     }
 };
 

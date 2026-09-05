@@ -130,6 +130,20 @@ const ensureRoleUser = async (
     }
 };
 
+const ensureArchivedRoleUser = async (
+    userId: string,
+    role: Role
+): Promise<void> => {
+    const user = await prisma.user.findFirst({
+        where: { id: userId, role, archivedAt: { not: null } },
+        select: { id: true }
+    });
+
+    if (!user) {
+        throw new HttpError(409, `User must be archived before it can be deleted permanently.`);
+    }
+};
+
 const getArchivedAtForStatus = (isActive: boolean): Date | null => {
     return isActive ? null : new Date();
 };
@@ -235,12 +249,9 @@ export const createDoctorUser = async (input: ValidatedCreateDoctorInput) => {
 };
 
 export const createPatientUser = async (
-    input: ValidatedCreatePatientInput,
-    createdByUserId: string
+    input: ValidatedCreatePatientInput
 ) => {
     await ensureEmailAvailable(input.email);
-
-    const doctorProfileId = await getDoctorProfileIdForUser(createdByUserId);
 
     const temporaryPassword = generateTemporaryPassword();
     const hashedPassword = await hashPassword(temporaryPassword);
@@ -260,7 +271,7 @@ export const createPatientUser = async (
                     contactNumber: input.contactNumber ?? null,
                     address: input.address ?? null,
                     medicalCondition: input.medicalCondition ?? null,
-                    assignedDoctorId: doctorProfileId
+                    assignedDoctorId: null
                 }
             }
         },
@@ -614,5 +625,105 @@ export const assignPatientToDoctor = async (
         select: {
             ...patientUserSelect
         }
+    });
+};
+
+export const resetPatientPassword = async (
+    patientUserId: string,
+    input: ValidatedResetPasswordInput
+) => {
+    await ensureRoleUser(patientUserId, Role.PATIENT, "Patient not found.");
+    await updateUserPassword(patientUserId, input.password);
+};
+
+export const updatePatientAccountStatus = async (
+    patientUserId: string,
+    input: ValidatedAccountStatusInput
+) => {
+    await ensureRoleUser(patientUserId, Role.PATIENT, "Patient not found.");
+
+    return prisma.user.update({
+        where: { id: patientUserId },
+        data: {
+            isActive: input.isActive,
+            archivedAt: getArchivedAtForStatus(input.isActive)
+        },
+        select: {
+            ...patientUserSelect
+        }
+    });
+};
+
+export const updatePatientProfile = async (
+    patientUserId: string,
+    input: ValidatedUpdatePatientInput
+) => {
+    await ensureRoleUser(patientUserId, Role.PATIENT, "Patient not found.");
+
+    await prisma.patientProfile.update({
+        where: { userId: patientUserId },
+        data: buildPatientProfileUpdateData(input)
+    });
+
+    return prisma.user.findUnique({
+        where: { id: patientUserId },
+        select: {
+            ...patientUserSelect
+        }
+    });
+};
+
+export const deleteDoctorUserPermanently = async (doctorUserId: string) => {
+    const doctor = await prisma.user.findFirst({
+        where: {
+            id: doctorUserId,
+            role: Role.DOCTOR,
+            archivedAt: { not: null }
+        },
+        select: {
+            id: true,
+            doctorProfile: {
+                select: { id: true }
+            }
+        }
+    });
+
+    if (!doctor) {
+        throw new HttpError(409, "Doctor must be archived before it can be deleted permanently.");
+    }
+
+    const doctorProfile = doctor.doctorProfile;
+
+    if (!doctorProfile) {
+        await prisma.user.delete({
+            where: { id: doctorUserId }
+        });
+        return;
+    }
+
+    await prisma.$transaction(async (tx) => {
+        await tx.patientProfile.updateMany({
+            where: { assignedDoctorId: doctorProfile.id },
+            data: { assignedDoctorId: null }
+        });
+
+        await tx.exerciseAssignment.deleteMany({
+            where: { assignedByDoctorId: doctorProfile.id }
+        });
+
+        await tx.user.delete({
+            where: { id: doctorUserId }
+        });
+    });
+};
+
+export const deletePatientUserPermanently = async (patientUserId: string) => {
+    await ensureArchivedRoleUser(
+        patientUserId,
+        Role.PATIENT
+    );
+
+    await prisma.user.delete({
+        where: { id: patientUserId }
     });
 };
